@@ -1,0 +1,61 @@
+.message-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 88%;
+}
+
+.message-bubble--user {
+  align-self: flex-end;
+}
+
+.message-bubble--assistant {
+  align-self: flex-start;
+}
+
+.message-bubble__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  padding-left: var(--space-1);
+}
+
+.message-bubble__content {
+  padding: var(--space-3) var(--space-4);
+  border-radius: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message-bubble--user .message-bubble__content {
+  background: var(--accent-subtle);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  border-radius: 12px 12px 2px 12px;
+}
+
+.message-bubble--assistant .message-bubble__content {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-family: var(--font-chat);
+  font-size: 14px;
+  border-radius: 2px 12px 12px 12px;
+}
+
+.message-bubble__cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--accent);
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
