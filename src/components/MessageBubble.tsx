@@ -8,12 +8,9 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
   const isUser = message.role === 'user'
-
   return (
     <div className={`message-bubble message-bubble--${isUser ? 'user' : 'assistant'}`}>
-      {!isUser && (
-        <div className="message-bubble__label">Nika</div>
-      )}
+      {!isUser && <div className="message-bubble__label">VLM</div>}
       <div className="message-bubble__content">
         {message.content}
         {isStreaming && <span className="message-bubble__cursor" aria-hidden />}

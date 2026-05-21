@@ -1,0 +1,8 @@
+.video-upload { border: 2px dashed var(--border); border-radius: 12px; padding: var(--space-8) var(--space-6); display: flex; flex-direction: column; align-items: center; gap: var(--space-2); cursor: pointer; transition: border-color 0.15s, background 0.15s; user-select: none; }
+.video-upload:hover:not(.video-upload--uploading) { border-color: var(--accent-dim); background: var(--accent-subtle); }
+.video-upload--drag-over { border-color: var(--accent); background: var(--accent-subtle); }
+.video-upload--uploading { cursor: default; opacity: 0.7; }
+.video-upload__icon { font-size: 32px; line-height: 1; }
+.video-upload__label { font-size: 14px; color: var(--text-secondary); margin: 0; }
+.video-upload__hint { font-size: 12px; color: var(--text-muted); margin: 0; }
+.video-upload__error { font-size: 12px; color: oklch(0.65 0.15 25); margin: var(--space-2) 0 0; }
