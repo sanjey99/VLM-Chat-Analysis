@@ -9,7 +9,6 @@ async function appFetch(url: string, init?: RequestInit): Promise<Response> {
   }
   return globalThis.fetch(url, init)
 }
-const BACKEND = 'http://localhost:8000'
 
 export interface UploadResult {
   video_id: string
@@ -78,7 +77,7 @@ export async function* streamChat(
 
 export async function checkHealth(): Promise<'ready' | 'loading' | 'offline'> {
   try {
-    const res = await appFetch(`${BACKEND}/health`, { signal: AbortSignal.timeout(3000) })
+    const res = await appFetch(`${BACKEND}/health`)
     if (!res.ok) return 'offline'
     const data = await res.json()
     return data.status === 'ready' ? 'ready' : 'loading'
