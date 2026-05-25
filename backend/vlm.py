@@ -68,7 +68,7 @@ class QwenAdapter(BaseAdapter):
         )
         self.model = AutoModelForImageTextToText.from_pretrained(
             self.model_id,
-            torch_dtype=None if self.cfg["use_4bit"] else torch.bfloat16,
+            dtype=None if self.cfg["use_4bit"] else torch.bfloat16,
             quantization_config=self._quantization_config(),
             device_map="auto",
         )
@@ -118,7 +118,7 @@ class GemmaAdapter(BaseAdapter):
         self.processor = AutoProcessor.from_pretrained(self.model_id)
         self.model = AutoModelForImageTextToText.from_pretrained(
             self.model_id,
-            torch_dtype=None if self.cfg["use_4bit"] else torch.bfloat16,
+            dtype=None if self.cfg["use_4bit"] else torch.bfloat16,
             quantization_config=self._quantization_config(),
             device_map="auto",
         )

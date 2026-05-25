@@ -1,0 +1,29 @@
+From 3ca098fddd91131ef3f35c7985e6036b702ec176 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 25 May 2026 04:29:03 +0000
+Subject: [PATCH] Fix video_utils: remove stale FPS/MAX_FRAMES import from old
+ config
+
+---
+ backend/video_utils.py | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/backend/video_utils.py b/backend/video_utils.py
+index 26d802f..fae45d8 100644
+--- a/backend/video_utils.py
++++ b/backend/video_utils.py
+@@ -1,10 +1,9 @@
+ from pathlib import Path
+ from decord import VideoReader, cpu
+ from PIL import Image
+-from config import FPS, MAX_FRAMES
+ 
+ 
+-def extract_frames(video_path: str, fps: float = FPS, max_frames: int = MAX_FRAMES) -> list[Image.Image]:
++def extract_frames(video_path: str, fps: float = 1.0, max_frames: int = 8) -> list[Image.Image]:
+     vr = VideoReader(video_path, ctx=cpu(0))
+     total_frames = len(vr)
+     video_fps = vr.get_avg_fps()
+-- 
+2.43.0
+
