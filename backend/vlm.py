@@ -59,14 +59,14 @@ class BaseAdapter(ABC):
 
 class QwenAdapter(BaseAdapter):
     def load(self) -> None:
-        from transformers import Qwen2_5_VLForConditionalGeneration
+        from transformers import AutoModelForImageTextToText
 
         # Qwen3-VL uses the same class as Qwen2.5-VL in current transformers
         self.processor = AutoProcessor.from_pretrained(
             self.model_id,
             max_pixels=self.cfg["max_pixels"],
         )
-        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+        self.model = AutoModelForImageTextToText.from_pretrained(
             self.model_id,
             torch_dtype=None if self.cfg["use_4bit"] else torch.bfloat16,
             quantization_config=self._quantization_config(),
