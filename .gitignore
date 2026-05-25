@@ -23,3 +23,15 @@ dist-ssr
 *.sln
 *.sw?
 sanjey.md
+
+# Python
+backend/__pycache__/
+backend/uploads/
+__pycache__/
+*.pyc
+
+# Root-level accidental uploads dir
+/uploads/
+
+# Rust
+src-tauri/target/
