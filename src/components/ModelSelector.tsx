@@ -23,7 +23,7 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
         setActiveModel(current)
         if (loading && current) setLoadingModel(current)
       })
-      .catch(() => {})
+      .catch((err) => setError(`Could not load models: ${(err as Error).message}`))
   }, [])
 
   // Poll system/info while a model is loading

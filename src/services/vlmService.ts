@@ -1,4 +1,3 @@
-import { fetch } from '@tauri-apps/plugin-http'
 import type { ModelInfo, SystemInfo } from '../types'
 
 const BACKEND = 'http://localhost:8000'
