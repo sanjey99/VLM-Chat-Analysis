@@ -2,6 +2,15 @@ import type { ModelInfo, SystemInfo } from '../types'
 
 const BACKEND = 'http://localhost:8000'
 
+async function appFetch(url: string, init?: RequestInit): Promise<Response> {
+  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http')
+    return tauriFetch(url, init)
+  }
+  return globalThis.fetch(url, init)
+}
+const BACKEND = 'http://localhost:8000'
+
 export interface UploadResult {
   video_id: string
   filename: string
@@ -12,7 +21,7 @@ export async function uploadVideo(file: File): Promise<UploadResult> {
   const body = new FormData()
   body.append('file', file)
 
-  const res = await fetch(`${BACKEND}/upload`, { method: 'POST', body })
+  const res = await appFetch(`${BACKEND}/upload`, { method: 'POST', body })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail ?? `Upload failed (${res.status})`)
@@ -26,7 +35,7 @@ export async function* streamChat(
   history: Array<{ role: 'user' | 'assistant'; content: string }>,
   signal?: AbortSignal
 ): AsyncGenerator<string> {
-  const res = await fetch(`${BACKEND}/chat/stream`, {
+  const res = await appFetch(`${BACKEND}/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ video_id: videoId, prompt, history }),
@@ -69,7 +78,7 @@ export async function* streamChat(
 
 export async function checkHealth(): Promise<'ready' | 'loading' | 'offline'> {
   try {
-    const res = await fetch(`${BACKEND}/health`, { signal: AbortSignal.timeout(3000) })
+    const res = await appFetch(`${BACKEND}/health`, { signal: AbortSignal.timeout(3000) })
     if (!res.ok) return 'offline'
     const data = await res.json()
     return data.status === 'ready' ? 'ready' : 'loading'
@@ -83,13 +92,13 @@ export async function listModels(): Promise<{
   current: string | null
   loading: boolean
 }> {
-  const res = await fetch(`${BACKEND}/models`)
+  const res = await appFetch(`${BACKEND}/models`)
   if (!res.ok) throw new Error(`Failed to list models (${res.status})`)
   return res.json()
 }
 
 export async function loadModel(modelId: string): Promise<void> {
-  const res = await fetch(`${BACKEND}/load-model`, {
+  const res = await appFetch(`${BACKEND}/load-model`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model_id: modelId }),
@@ -101,7 +110,7 @@ export async function loadModel(modelId: string): Promise<void> {
 }
 
 export async function getSystemInfo(): Promise<SystemInfo> {
-  const res = await fetch(`${BACKEND}/system/info`)
+  const res = await appFetch(`${BACKEND}/system/info`)
   if (!res.ok) throw new Error(`Failed to get system info (${res.status})`)
   return res.json()
 }

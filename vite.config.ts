@@ -6,6 +6,7 @@ export default defineConfig({
   clearScreen: false,
   server: {
     port: 1420,
+    host: '127.0.0.1',
     strictPort: true,
     watch: {
       ignored: ['**/src-tauri/**'],
@@ -15,13 +16,5 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
-  },
-  server: {
-    port: 1420,
-    host: '127.0.0.1',
-    strictPort: true,
-    watch: {
-      ignored: ['**/src-tauri/**'],
-    },
   },
 })

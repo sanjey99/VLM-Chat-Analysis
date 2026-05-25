@@ -1,0 +1,42 @@
+$ git format-patch HEAD~1 --stdout
+
+From f8f5043174ede2dceddfccf2742e4757eaa95d1d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 25 May 2026 10:35:41 +0000
+Subject: [PATCH] fix: use native fetch instead of @tauri-apps/plugin-http
+
+The Tauri IPC fetch fails silently in browser dev mode, preventing
+models from loading. Native fetch works in both environments since the
+CSP already allows http://localhost:8000. Also surface fetch errors in
+the model selector instead of swallowing them.
+
+https://claude.ai/code/session_01VUY41RuuV1AUp6D74VM2CX
+---
+ src/components/ModelSelector.tsx | 2 +-
+ src/services/vlmService.ts       | 1 -
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/src/components/ModelSelector.tsx b/src/components/ModelSelector.tsx
+index bd93729..fe3043d 100644
+--- a/src/components/ModelSelector.tsx
++++ b/src/components/ModelSelector.tsx
+@@ -23,7 +23,7 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
+         setActiveModel(current)
+         if (loading && current) setLoadingModel(current)
+       })
+-      .catch(() => {})
++      .catch((err) => setError(`Could not load models: ${(err as Error).message}`))
+   }, [])
+ 
+   // Poll system/info while a model is loading
+diff --git a/src/services/vlmService.ts b/src/services/vlmService.ts
+index 7a8aee6..3fabbdb 100644
+--- a/src/services/vlmService.ts
++++ b/src/services/vlmService.ts
+@@ -1,4 +1,3 @@
+-import { fetch } from '@tauri-apps/plugin-http'
+ import type { ModelInfo, SystemInfo } from '../types'
+ 
+ const BACKEND = 'http://localhost:8000'
+-- 
+2.43.0

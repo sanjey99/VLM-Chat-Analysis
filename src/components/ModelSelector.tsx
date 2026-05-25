@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ModelInfo } from '../types'
 import { getSystemInfo, listModels, loadModel } from '../services/vlmService'
 import './ModelSelector.css'
@@ -16,15 +16,18 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
   const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => {
-    listModels()
-      .then(({ models, current, loading }) => {
-        setModels(models)
-        setActiveModel(current)
-        if (loading && current) setLoadingModel(current)
-      })
-      .catch((err) => setError(`Could not load models: ${(err as Error).message}`))
-  }, [])
+  const fetchModels = useCallback(() => {
+  setError(null)
+  listModels()
+    .then(({ models, current, loading }) => {
+      setModels(models)
+      setActiveModel(current)
+      if (loading && current) setLoadingModel(current)
+    })
+    .catch((err) => setError(`Could not reach backend: ${(err as Error).message}`))
+}, [])
+
+useEffect(() => { fetchModels() }, [fetchModels])
 
   // Poll system/info while a model is loading
   useEffect(() => {
@@ -90,7 +93,12 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
           )
         })}
       </div>
-      {error && <p className="model-selector__error">{error}</p>}
+      {error && (
+  <div className="model-selector__error-row">
+    <p className="model-selector__error">{error}</p>
+    <button className="model-selector__retry" onClick={fetchModels}>Retry</button>
+  </div>
+)}
     </div>
   )
 }
