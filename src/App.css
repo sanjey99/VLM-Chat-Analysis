@@ -1,5 +1,4 @@
 /* src/App.css */
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Source+Serif+4:ital,opsz,wght@0,8..60,300..900;1,8..60,300..900&display=swap');
 
 :root {
   --bg-base:      oklch(0.12 0.01 60);
@@ -15,8 +14,8 @@
   --border:       oklch(0.22 0.01 60);
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
   --space-6: 24px; --space-8: 32px; --space-12: 48px;
-  --font-ui: 'Bricolage Grotesque', system-ui, sans-serif;
-  --font-chat: 'Source Serif 4', Georgia, serif;
+  --font-ui: system-ui, sans-serif;
+  --font-chat: Georgia, serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
