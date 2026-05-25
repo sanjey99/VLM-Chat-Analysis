@@ -10,3 +10,17 @@ export interface VideoSession {
   filename: string
   duration: number
 }
+
+export interface ModelInfo {
+  id: string
+  label: string
+}
+
+export interface SystemInfo {
+  gpu: string | null
+  vram_total_gb: number | null
+  vram_used_gb: number | null
+  current_model: string | null
+  loading: boolean
+  ready: boolean
+}

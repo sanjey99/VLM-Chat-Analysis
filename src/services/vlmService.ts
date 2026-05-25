@@ -1,3 +1,5 @@
+import type { ModelInfo, SystemInfo } from '../types'
+
 const BACKEND = 'http://localhost:8000'
 
 export interface UploadResult {
@@ -74,4 +76,32 @@ export async function checkHealth(): Promise<'ready' | 'loading' | 'offline'> {
   } catch {
     return 'offline'
   }
+}
+
+export async function listModels(): Promise<{
+  models: ModelInfo[]
+  current: string | null
+  loading: boolean
+}> {
+  const res = await fetch(`${BACKEND}/models`)
+  if (!res.ok) throw new Error(`Failed to list models (${res.status})`)
+  return res.json()
+}
+
+export async function loadModel(modelId: string): Promise<void> {
+  const res = await fetch(`${BACKEND}/load-model`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model_id: modelId }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail ?? `Load failed (${res.status})`)
+  }
+}
+
+export async function getSystemInfo(): Promise<SystemInfo> {
+  const res = await fetch(`${BACKEND}/system/info`)
+  if (!res.ok) throw new Error(`Failed to get system info (${res.status})`)
+  return res.json()
 }

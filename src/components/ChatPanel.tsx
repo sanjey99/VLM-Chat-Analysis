@@ -6,9 +6,10 @@ import './ChatPanel.css'
 
 interface ChatPanelProps {
   videoId: string | null
+  modelReady: boolean
 }
 
-export function ChatPanel({ videoId }: ChatPanelProps) {
+export function ChatPanel({ videoId, modelReady }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
@@ -19,7 +20,7 @@ export function ChatPanel({ videoId }: ChatPanelProps) {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, streamingContent])
   useEffect(() => { setMessages([]); setStreamingContent('') }, [videoId])
 
-  const disabled = !videoId || isStreaming
+  const disabled = !videoId || isStreaming || !modelReady
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -49,7 +50,9 @@ export function ChatPanel({ videoId }: ChatPanelProps) {
       <div className="chat-panel__messages">
         {messages.length === 0 && (
           <div className="chat-panel__empty">
-            {videoId ? (
+            {!modelReady ? (
+              <p>Select a model above to get started.</p>
+            ) : videoId ? (
               <><p>Video loaded. Ask anything about what's in the video.</p>
               <p className="chat-panel__empty-hint">Try: "What's happening in this video?" or "Describe the main scene"</p></>
             ) : <p>Upload a video above to start chatting.</p>}
@@ -63,7 +66,7 @@ export function ChatPanel({ videoId }: ChatPanelProps) {
       </div>
       <form className="chat-panel__form" onSubmit={handleSubmit}>
         <input className="chat-panel__input" type="text" value={input} onChange={(e) => setInput(e.target.value)}
-          placeholder={videoId ? 'Ask about the video…' : 'Upload a video first…'} disabled={disabled} autoFocus />
+          placeholder={!modelReady ? 'Waiting for model…' : videoId ? 'Ask about the video…' : 'Upload a video first…'} disabled={disabled} autoFocus />
         <button className="chat-panel__send" type="submit" disabled={disabled || !input.trim()} aria-label="Send">
           {isStreaming ? '◼' : '↑'}
         </button>

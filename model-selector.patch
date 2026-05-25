@@ -1,0 +1,754 @@
+$ cat /tmp/model-selector.patch
+
+From f9043752b707aae3e1b2af5a89b62df4023beda5 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 25 May 2026 03:39:52 +0000
+Subject: [PATCH] Add model selector with per-model adapter pattern
+
+---
+ backend/config.py                |  47 ++++--
+ backend/main.py                  |  61 +++++++-
+ backend/vlm.py                   | 241 ++++++++++++++++++++++++-------
+ src/App.tsx                      |   5 +-
+ src/components/ChatPanel.tsx     |  11 +-
+ src/components/ModelSelector.css |  52 +++++++
+ src/components/ModelSelector.tsx |  96 ++++++++++++
+ src/services/vlmService.ts       |  30 ++++
+ src/types/index.ts               |  14 ++
+ 9 files changed, 481 insertions(+), 76 deletions(-)
+ create mode 100644 src/components/ModelSelector.css
+ create mode 100644 src/components/ModelSelector.tsx
+
+diff --git a/backend/config.py b/backend/config.py
+index 16500f3..8b77dd6 100644
+--- a/backend/config.py
++++ b/backend/config.py
+@@ -1,14 +1,39 @@
+-MODEL_ID = "Qwen/Qwen2.5-VL-7B-Instruct"
++MODEL_REGISTRY: dict[str, dict] = {
++    "Qwen/Qwen3-VL-2B-Instruct": {
++        "label": "Qwen3-VL 2B — Fastest",
++        "family": "qwen",
++        "use_4bit": False,
++        "max_pixels": 1280 * 28 * 28,
++        "fps": 1.0,
++        "max_frames": 8,
++    },
++    "Qwen/Qwen3-VL-4B-Instruct": {
++        "label": "Qwen3-VL 4B — Balanced",
++        "family": "qwen",
++        "use_4bit": False,
++        "max_pixels": 1280 * 28 * 28,
++        "fps": 1.0,
++        "max_frames": 8,
++    },
++    "Qwen/Qwen3-VL-8B-Instruct": {
++        "label": "Qwen3-VL 8B — Quality",
++        "family": "qwen",
++        "use_4bit": False,
++        "max_pixels": 1280 * 28 * 28,
++        "fps": 1.0,
++        "max_frames": 8,
++    },
++    "google/gemma-4-E4B-it": {
++        "label": "Gemma 4 E4B — Google Alt",
++        "family": "gemma",
++        "use_4bit": False,
++        "max_pixels": 896 * 896,
++        "fps": 1.0,
++        "max_frames": 8,
++    },
++}
+ 
+-# Set True to load in 4-bit (needs bitsandbytes) — cuts VRAM from ~15 GB to ~5 GB
+-USE_4BIT = False
++DEFAULT_MODEL = "Qwen/Qwen3-VL-2B-Instruct"
+ 
+-# Frames per second to sample from video; capped by MAX_FRAMES
+-FPS = 1.0
+-MAX_FRAMES = 16
+-
+-# Per-image resolution cap — reduce to 720*28*28 to save VRAM
+-MAX_PIXELS = 1280 * 28 * 28
+-
+-# Generation limit
++# Fallback generation cap (per-model fps/max_frames take precedence)
+ MAX_NEW_TOKENS = 512
+diff --git a/backend/main.py b/backend/main.py
+index 17c3a9b..31ebfbb 100644
+--- a/backend/main.py
++++ b/backend/main.py
+@@ -6,15 +6,17 @@ from contextlib import asynccontextmanager
+ from pathlib import Path
+ from typing import Optional
+ 
++import torch
+ from fastapi import FastAPI, File, HTTPException, UploadFile
+ from fastapi.middleware.cors import CORSMiddleware
+ from fastapi.responses import StreamingResponse
+ from pydantic import BaseModel
+ 
+ from video_utils import extract_frames, get_duration, is_supported
+-from vlm import generate_stream, is_ready, load_model
++from vlm import current_model_id, generate_stream, is_loading, is_ready, load_model
++from config import DEFAULT_MODEL, MODEL_REGISTRY
+ 
+-UPLOAD_DIR = Path("uploads")
++UPLOAD_DIR = Path(__file__).parent / "uploads"
+ UPLOAD_DIR.mkdir(exist_ok=True)
+ 
+ _video_store: dict[str, dict] = {}
+@@ -22,7 +24,7 @@ _video_store: dict[str, dict] = {}
+ 
+ @asynccontextmanager
+ async def lifespan(app: FastAPI):
+-    threading.Thread(target=load_model, daemon=True).start()
++    threading.Thread(target=load_model, args=(DEFAULT_MODEL,), daemon=True).start()
+     yield
+ 
+ 
+@@ -41,6 +43,53 @@ async def health():
+     return {"status": "ready" if is_ready() else "loading"}
+ 
+ 
++@app.get("/models")
++async def list_models():
++    return {
++        "models": [
++            {"id": mid, "label": cfg["label"]}
++            for mid, cfg in MODEL_REGISTRY.items()
++        ],
++        "current": current_model_id(),
++        "loading": is_loading(),
++    }
++
++
++class LoadModelRequest(BaseModel):
++    model_id: str
++
++
++@app.post("/load-model")
++async def load_model_endpoint(req: LoadModelRequest):
++    if req.model_id not in MODEL_REGISTRY:
++        raise HTTPException(400, f"Unknown model: {req.model_id}")
++    if is_loading():
++        raise HTTPException(409, "A model is already loading — please wait.")
++    threading.Thread(target=load_model, args=(req.model_id,), daemon=True).start()
++    return {"status": "loading", "model_id": req.model_id}
++
++
++@app.get("/system/info")
++async def system_info():
++    gpu_name = None
++    vram_total_gb = None
++    vram_used_gb = None
++    if torch.cuda.is_available():
++        props = torch.cuda.get_device_properties(0)
++        gpu_name = props.name
++        vram_total_gb = round(props.total_memory / 1024 ** 3, 1)
++        vram_used_gb = round(torch.cuda.memory_allocated(0) / 1024 ** 3, 2)
++
++    return {
++        "gpu": gpu_name,
++        "vram_total_gb": vram_total_gb,
++        "vram_used_gb": vram_used_gb,
++        "current_model": current_model_id(),
++        "loading": is_loading(),
++        "ready": is_ready(),
++    }
++
++
+ @app.post("/upload")
+ async def upload_video(file: UploadFile = File(...)):
+     if not is_supported(file.filename or ""):
+@@ -77,12 +126,16 @@ async def chat_stream(req: ChatRequest):
+         raise HTTPException(404, "Video not found. Upload a video first.")
+ 
+     video = _video_store[req.video_id]
++    model_cfg = MODEL_REGISTRY.get(current_model_id() or "", {})
++    fps = model_cfg.get("fps", 1.0)
++    max_frames = model_cfg.get("max_frames", 8)
++
+     loop = asyncio.get_event_loop()
+     queue: asyncio.Queue = asyncio.Queue()
+ 
+     def run():
+         try:
+-            frames = extract_frames(video["path"])
++            frames = extract_frames(video["path"], fps=fps, max_frames=max_frames)
+             for token in generate_stream(frames, req.prompt, req.history or []):
+                 loop.call_soon_threadsafe(queue.put_nowait, token)
+         except Exception as exc:
+diff --git a/backend/vlm.py b/backend/vlm.py
+index 172491e..fadd02e 100644
+--- a/backend/vlm.py
++++ b/backend/vlm.py
+@@ -1,42 +1,203 @@
++import gc
+ import threading
++from abc import ABC, abstractmethod
+ from typing import Iterator
++
+ import torch
+-from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor, TextIteratorStreamer
+-from qwen_vl_utils import process_vision_info
+ from PIL import Image
+-from config import MODEL_ID, USE_4BIT, MAX_PIXELS, MAX_NEW_TOKENS
++from transformers import AutoProcessor, TextIteratorStreamer
++
++from config import MODEL_REGISTRY, MAX_NEW_TOKENS
++
++_adapter = None
++_current_model_id: str | None = None
++_load_lock = threading.Lock()
++_gen_lock = threading.Lock()
++_loading = False
+ 
+-_model = None
+-_processor = None
+-_lock = threading.Lock()
+ 
++# ---------------------------------------------------------------------------
++# Adapters
++# ---------------------------------------------------------------------------
+ 
+-def load_model() -> None:
+-    global _model, _processor
++class BaseAdapter(ABC):
++    def __init__(self, model_id: str, cfg: dict):
++        self.model_id = model_id
++        self.cfg = cfg
++        self.processor = None
++        self.model = None
+ 
+-    quantization_config = None
+-    if USE_4BIT:
++    def _quantization_config(self):
++        if not self.cfg["use_4bit"]:
++            return None
+         from transformers import BitsAndBytesConfig
+-        quantization_config = BitsAndBytesConfig(
++        return BitsAndBytesConfig(
+             load_in_4bit=True,
+             bnb_4bit_compute_dtype=torch.bfloat16,
+         )
+ 
+-    _processor = AutoProcessor.from_pretrained(
+-        MODEL_ID,
+-        max_pixels=MAX_PIXELS,
+-    )
+-    _model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+-        MODEL_ID,
+-        torch_dtype=None if USE_4BIT else torch.bfloat16,
+-        quantization_config=quantization_config,
+-        device_map="auto",
+-    )
+-    _model.eval()
++    @abstractmethod
++    def load(self) -> None: ...
++
++    @abstractmethod
++    def generate_stream(
++        self,
++        frames: list[Image.Image],
++        prompt: str,
++        history: list[dict],
++    ) -> Iterator[str]: ...
++
++    def unload(self) -> None:
++        del self.model
++        del self.processor
++        self.model = None
++        self.processor = None
++        gc.collect()
++        if torch.cuda.is_available():
++            torch.cuda.empty_cache()
++
++
++class QwenAdapter(BaseAdapter):
++    def load(self) -> None:
++        from transformers import Qwen2_5_VLForConditionalGeneration
++
++        # Qwen3-VL uses the same class as Qwen2.5-VL in current transformers
++        self.processor = AutoProcessor.from_pretrained(
++            self.model_id,
++            max_pixels=self.cfg["max_pixels"],
++        )
++        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
++            self.model_id,
++            torch_dtype=None if self.cfg["use_4bit"] else torch.bfloat16,
++            quantization_config=self._quantization_config(),
++            device_map="auto",
++        )
++        self.model.eval()
++
++    def generate_stream(
++        self,
++        frames: list[Image.Image],
++        prompt: str,
++        history: list[dict],
++    ) -> Iterator[str]:
++        from qwen_vl_utils import process_vision_info
++
++        messages = list(history)
++        content = [{"type": "image", "image": frame} for frame in frames]
++        content.append({"type": "text", "text": prompt})
++        messages.append({"role": "user", "content": content})
++
++        text = self.processor.apply_chat_template(
++            messages, tokenize=False, add_generation_prompt=True
++        )
++        image_inputs, video_inputs = process_vision_info(messages)
++        inputs = self.processor(
++            text=[text],
++            images=image_inputs,
++            videos=video_inputs,
++            return_tensors="pt",
++        ).to(self.model.device)
++
++        streamer = TextIteratorStreamer(
++            self.processor.tokenizer,
++            skip_prompt=True,
++            skip_special_tokens=True,
++        )
++        gen_kwargs = dict(**inputs, streamer=streamer, max_new_tokens=MAX_NEW_TOKENS)
++        thread = threading.Thread(target=self.model.generate, kwargs=gen_kwargs, daemon=True)
++        with _gen_lock:
++            thread.start()
++            yield from streamer
++            thread.join()
++
++
++class GemmaAdapter(BaseAdapter):
++    def load(self) -> None:
++        from transformers import AutoModelForImageTextToText
++
++        self.processor = AutoProcessor.from_pretrained(self.model_id)
++        self.model = AutoModelForImageTextToText.from_pretrained(
++            self.model_id,
++            torch_dtype=None if self.cfg["use_4bit"] else torch.bfloat16,
++            quantization_config=self._quantization_config(),
++            device_map="auto",
++        )
++        self.model.eval()
++
++    def generate_stream(
++        self,
++        frames: list[Image.Image],
++        prompt: str,
++        history: list[dict],
++    ) -> Iterator[str]:
++        messages = list(history)
++        content = [{"type": "image", "image": frame} for frame in frames]
++        content.append({"type": "text", "text": prompt})
++        messages.append({"role": "user", "content": content})
++
++        inputs = self.processor.apply_chat_template(
++            messages,
++            add_generation_prompt=True,
++            tokenize=True,
++            return_dict=True,
++            return_tensors="pt",
++        ).to(self.model.device)
++
++        streamer = TextIteratorStreamer(
++            self.processor.tokenizer,
++            skip_prompt=True,
++            skip_special_tokens=True,
++        )
++        gen_kwargs = dict(**inputs, streamer=streamer, max_new_tokens=MAX_NEW_TOKENS)
++        thread = threading.Thread(target=self.model.generate, kwargs=gen_kwargs, daemon=True)
++        with _gen_lock:
++            thread.start()
++            yield from streamer
++            thread.join()
++
++
++# ---------------------------------------------------------------------------
++# Public API
++# ---------------------------------------------------------------------------
++
++_FAMILY_MAP = {"qwen": QwenAdapter, "gemma": GemmaAdapter}
++
++
++def _build_adapter(model_id: str) -> BaseAdapter:
++    cfg = MODEL_REGISTRY[model_id]
++    cls = _FAMILY_MAP[cfg["family"]]
++    return cls(model_id, cfg)
++
++
++def load_model(model_id: str) -> None:
++    global _adapter, _current_model_id, _loading
++
++    with _load_lock:
++        _loading = True
++        try:
++            if _adapter is not None:
++                _adapter.unload()
++                _adapter = None
++                _current_model_id = None
++
++            new_adapter = _build_adapter(model_id)
++            new_adapter.load()
++            _adapter = new_adapter
++            _current_model_id = model_id
++        finally:
++            _loading = False
+ 
+ 
+ def is_ready() -> bool:
+-    return _model is not None
++    return _adapter is not None and not _loading
++
++
++def is_loading() -> bool:
++    return _loading
++
++
++def current_model_id() -> str | None:
++    return _current_model_id
+ 
+ 
+ def generate_stream(
+@@ -44,36 +205,4 @@ def generate_stream(
+     prompt: str,
+     history: list[dict],
+ ) -> Iterator[str]:
+-    messages = list(history)
+-
+-    content = [{"type": "image", "image": frame} for frame in frames]
+-    content.append({"type": "text", "text": prompt})
+-    messages.append({"role": "user", "content": content})
+-
+-    text = _processor.apply_chat_template(
+-        messages,
+-        tokenize=False,
+-        add_generation_prompt=True,
+-    )
+-    image_inputs, video_inputs = process_vision_info(messages)
+-    inputs = _processor(
+-        text=[text],
+-        images=image_inputs,
+-        videos=video_inputs,
+-        return_tensors="pt",
+-    ).to(_model.device)
+-
+-    streamer = TextIteratorStreamer(
+-        _processor.tokenizer,
+-        skip_prompt=True,
+-        skip_special_tokens=True,
+-    )
+-
+-    gen_kwargs = dict(**inputs, streamer=streamer, max_new_tokens=MAX_NEW_TOKENS)
+-
+-    thread = threading.Thread(target=_model.generate, kwargs=gen_kwargs, daemon=True)
+-    with _lock:
+-        thread.start()
+-        for token in streamer:
+-            yield token
+-        thread.join()
++    return _adapter.generate_stream(frames, prompt, history)
+diff --git a/src/App.tsx b/src/App.tsx
+index 1357b14..00dcff6 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -2,11 +2,13 @@ import { useState } from 'react'
+ import { VideoUpload } from './components/VideoUpload'
+ import { VideoPreview } from './components/VideoPreview'
+ import { ChatPanel } from './components/ChatPanel'
++import { ModelSelector } from './components/ModelSelector'
+ import type { VideoSession } from './types'
+ import './App.css'
+ 
+ export default function App() {
+   const [session, setSession] = useState<VideoSession | null>(null)
++  const [activeModel, setActiveModel] = useState<string | null>(null)
+ 
+   return (
+     <div className="app">
+@@ -15,12 +17,13 @@ export default function App() {
+         <p className="app__subtitle">Describe and query video scenes with AI</p>
+       </header>
+       <main className="app__main">
++        <ModelSelector onModelReady={setActiveModel} />
+         {session ? (
+           <VideoPreview session={session} onClear={() => setSession(null)} />
+         ) : (
+           <VideoUpload onUpload={setSession} />
+         )}
+-        <ChatPanel videoId={session?.videoId ?? null} />
++        <ChatPanel videoId={session?.videoId ?? null} modelReady={!!activeModel} />
+       </main>
+     </div>
+   )
+diff --git a/src/components/ChatPanel.tsx b/src/components/ChatPanel.tsx
+index 5079ea6..a8a8471 100644
+--- a/src/components/ChatPanel.tsx
++++ b/src/components/ChatPanel.tsx
+@@ -6,9 +6,10 @@ import './ChatPanel.css'
+ 
+ interface ChatPanelProps {
+   videoId: string | null
++  modelReady: boolean
+ }
+ 
+-export function ChatPanel({ videoId }: ChatPanelProps) {
++export function ChatPanel({ videoId, modelReady }: ChatPanelProps) {
+   const [messages, setMessages] = useState<Message[]>([])
+   const [input, setInput] = useState('')
+   const [isStreaming, setIsStreaming] = useState(false)
+@@ -19,7 +20,7 @@ export function ChatPanel({ videoId }: ChatPanelProps) {
+   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, streamingContent])
+   useEffect(() => { setMessages([]); setStreamingContent('') }, [videoId])
+ 
+-  const disabled = !videoId || isStreaming
++  const disabled = !videoId || isStreaming || !modelReady
+ 
+   async function handleSubmit(e: React.FormEvent) {
+     e.preventDefault()
+@@ -49,7 +50,9 @@ export function ChatPanel({ videoId }: ChatPanelProps) {
+       <div className="chat-panel__messages">
+         {messages.length === 0 && (
+           <div className="chat-panel__empty">
+-            {videoId ? (
++            {!modelReady ? (
++              <p>Select a model above to get started.</p>
++            ) : videoId ? (
+               <><p>Video loaded. Ask anything about what's in the video.</p>
+               <p className="chat-panel__empty-hint">Try: "What's happening in this video?" or "Describe the main scene"</p></>
+             ) : <p>Upload a video above to start chatting.</p>}
+@@ -63,7 +66,7 @@ export function ChatPanel({ videoId }: ChatPanelProps) {
+       </div>
+       <form className="chat-panel__form" onSubmit={handleSubmit}>
+         <input className="chat-panel__input" type="text" value={input} onChange={(e) => setInput(e.target.value)}
+-          placeholder={videoId ? 'Ask about the video…' : 'Upload a video first…'} disabled={disabled} autoFocus />
++          placeholder={!modelReady ? 'Waiting for model…' : videoId ? 'Ask about the video…' : 'Upload a video first…'} disabled={disabled} autoFocus />
+         <button className="chat-panel__send" type="submit" disabled={disabled || !input.trim()} aria-label="Send">
+           {isStreaming ? '◼' : '↑'}
+         </button>
+diff --git a/src/components/ModelSelector.css b/src/components/ModelSelector.css
+new file mode 100644
+index 0000000..e896e79
+--- /dev/null
++++ b/src/components/ModelSelector.css
+@@ -0,0 +1,52 @@
++.model-selector { display: flex; flex-direction: column; gap: var(--space-2); }
++
++.model-selector__header { display: flex; align-items: center; justify-content: space-between; }
++
++.model-selector__label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
++
++.model-selector__vram { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
++
++.model-selector__options { display: flex; gap: var(--space-2); flex-wrap: wrap; }
++
++.model-selector__btn {
++  flex: 1;
++  min-width: 0;
++  padding: var(--space-2) var(--space-3);
++  background: var(--bg-elevated);
++  border: 1px solid var(--border);
++  border-radius: 8px;
++  color: var(--text-secondary);
++  font-size: 12px;
++  font-weight: 500;
++  cursor: pointer;
++  transition: border-color 0.15s, color 0.15s, background 0.15s;
++  white-space: nowrap;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  gap: var(--space-1);
++}
++
++.model-selector__btn:hover:not(:disabled) { border-color: var(--accent); color: var(--text-primary); }
++
++.model-selector__btn--active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
++
++.model-selector__btn--loading { border-color: var(--accent); color: var(--text-muted); cursor: not-allowed; }
++
++.model-selector__btn:disabled:not(.model-selector__btn--loading) { opacity: 0.4; cursor: not-allowed; }
++
++.model-selector__spinner {
++  width: 10px;
++  height: 10px;
++  border: 2px solid currentColor;
++  border-top-color: transparent;
++  border-radius: 50%;
++  animation: spin 0.7s linear infinite;
++  flex-shrink: 0;
++}
++
++@keyframes spin { to { transform: rotate(360deg); } }
++
++.model-selector__error { font-size: 12px; color: #e05; margin: 0; }
+diff --git a/src/components/ModelSelector.tsx b/src/components/ModelSelector.tsx
+new file mode 100644
+index 0000000..bd93729
+--- /dev/null
++++ b/src/components/ModelSelector.tsx
+@@ -0,0 +1,96 @@
++import { useEffect, useRef, useState } from 'react'
++import type { ModelInfo } from '../types'
++import { getSystemInfo, listModels, loadModel } from '../services/vlmService'
++import './ModelSelector.css'
++
++interface ModelSelectorProps {
++  onModelReady: (modelId: string) => void
++}
++
++export function ModelSelector({ onModelReady }: ModelSelectorProps) {
++  const [models, setModels] = useState<ModelInfo[]>([])
++  const [activeModel, setActiveModel] = useState<string | null>(null)
++  const [loadingModel, setLoadingModel] = useState<string | null>(null)
++  const [vramUsed, setVramUsed] = useState<number | null>(null)
++  const [vramTotal, setVramTotal] = useState<number | null>(null)
++  const [error, setError] = useState<string | null>(null)
++  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
++
++  useEffect(() => {
++    listModels()
++      .then(({ models, current, loading }) => {
++        setModels(models)
++        setActiveModel(current)
++        if (loading && current) setLoadingModel(current)
++      })
++      .catch(() => {})
++  }, [])
++
++  // Poll system/info while a model is loading
++  useEffect(() => {
++    if (!loadingModel) {
++      if (pollRef.current) clearInterval(pollRef.current)
++      return
++    }
++
++    pollRef.current = setInterval(async () => {
++      try {
++        const info = await getSystemInfo()
++        if (info.vram_used_gb !== null) setVramUsed(info.vram_used_gb)
++        if (info.vram_total_gb !== null) setVramTotal(info.vram_total_gb)
++        if (!info.loading && info.ready && info.current_model) {
++          setActiveModel(info.current_model)
++          setLoadingModel(null)
++          onModelReady(info.current_model)
++          clearInterval(pollRef.current!)
++        }
++      } catch {}
++    }, 1500)
++
++    return () => { if (pollRef.current) clearInterval(pollRef.current) }
++  }, [loadingModel, onModelReady])
++
++  async function handleSelect(modelId: string) {
++    if (modelId === activeModel || loadingModel) return
++    setError(null)
++    setLoadingModel(modelId)
++    try {
++      await loadModel(modelId)
++    } catch (err) {
++      setError((err as Error).message)
++      setLoadingModel(null)
++    }
++  }
++
++  return (
++    <div className="model-selector">
++      <div className="model-selector__header">
++        <span className="model-selector__label">Model</span>
++        {vramTotal !== null && (
++          <span className="model-selector__vram">
++            VRAM {vramUsed ?? '—'} / {vramTotal} GB
++          </span>
++        )}
++      </div>
++      <div className="model-selector__options">
++        {models.map((m) => {
++          const isActive = m.id === activeModel && !loadingModel
++          const isLoading = m.id === loadingModel
++          return (
++            <button
++              key={m.id}
++              className={`model-selector__btn${isActive ? ' model-selector__btn--active' : ''}${isLoading ? ' model-selector__btn--loading' : ''}`}
++              onClick={() => handleSelect(m.id)}
++              disabled={!!loadingModel}
++              title={m.id}
++            >
++              {isLoading && <span className="model-selector__spinner" />}
++              {m.label}
++            </button>
++          )
++        })}
++      </div>
++      {error && <p className="model-selector__error">{error}</p>}
++    </div>
++  )
++}
+diff --git a/src/services/vlmService.ts b/src/services/vlmService.ts
+index dabec10..3fabbdb 100644
+--- a/src/services/vlmService.ts
++++ b/src/services/vlmService.ts
+@@ -1,3 +1,5 @@
++import type { ModelInfo, SystemInfo } from '../types'
++
+ const BACKEND = 'http://localhost:8000'
+ 
+ export interface UploadResult {
+@@ -75,3 +77,31 @@ export async function checkHealth(): Promise<'ready' | 'loading' | 'offline'> {
+     return 'offline'
+   }
+ }
++
++export async function listModels(): Promise<{
++  models: ModelInfo[]
++  current: string | null
++  loading: boolean
++}> {
++  const res = await fetch(`${BACKEND}/models`)
++  if (!res.ok) throw new Error(`Failed to list models (${res.status})`)
++  return res.json()
++}
++
++export async function loadModel(modelId: string): Promise<void> {
++  const res = await fetch(`${BACKEND}/load-model`, {
++    method: 'POST',
++    headers: { 'Content-Type': 'application/json' },
++    body: JSON.stringify({ model_id: modelId }),
++  })
++  if (!res.ok) {
++    const err = await res.json().catch(() => ({ detail: res.statusText }))
++    throw new Error(err.detail ?? `Load failed (${res.status})`)
++  }
++}
++
++export async function getSystemInfo(): Promise<SystemInfo> {
++  const res = await fetch(`${BACKEND}/system/info`)
++  if (!res.ok) throw new Error(`Failed to get system info (${res.status})`)
++  return res.json()
++}
+diff --git a/src/types/index.ts b/src/types/index.ts
+index 63a6292..528cd95 100644
+--- a/src/types/index.ts
++++ b/src/types/index.ts
+@@ -10,3 +10,17 @@ export interface VideoSession {
+   filename: string
+   duration: number
+ }
++
++export interface ModelInfo {
++  id: string
++  label: string
++}
++
++export interface SystemInfo {
++  gpu: string | null
++  vram_total_gb: number | null
++  vram_used_gb: number | null
++  current_model: string | null
++  loading: boolean
++  ready: boolean
++}
+-- 
+2.43.0
