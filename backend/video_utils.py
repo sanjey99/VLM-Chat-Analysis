@@ -1,10 +1,9 @@
 from pathlib import Path
 from decord import VideoReader, cpu
 from PIL import Image
-from config import FPS, MAX_FRAMES
 
 
-def extract_frames(video_path: str, fps: float = FPS, max_frames: int = MAX_FRAMES) -> list[Image.Image]:
+def extract_frames(video_path: str, fps: float = 1.0, max_frames: int = 8) -> list[Image.Image]:
     vr = VideoReader(video_path, ctx=cpu(0))
     total_frames = len(vr)
     video_fps = vr.get_avg_fps()
