@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from video_utils import extract_frames, get_duration, is_supported
+from video_utils import extract_frames, get_duration, is_image, is_supported, load_image
 from vlm import current_model_id, generate_stream, is_loading, is_ready, load_model
 from config import DEFAULT_MODEL, MODEL_REGISTRY
 
@@ -47,7 +47,7 @@ async def health():
 async def list_models():
     return {
         "models": [
-            {"id": mid, "label": cfg["label"]}
+            {"id": mid, "label": cfg["label"], "input_type": cfg.get("input_type", "video")}
             for mid, cfg in MODEL_REGISTRY.items()
         ],
         "current": current_model_id(),
@@ -91,24 +91,30 @@ async def system_info():
 
 
 @app.post("/upload")
-async def upload_video(file: UploadFile = File(...)):
+async def upload_media(file: UploadFile = File(...)):
     if not is_supported(file.filename or ""):
-        raise HTTPException(400, "Unsupported format. Use MP4, AVI, MOV, MKV, or WebM.")
+        raise HTTPException(400, "Unsupported format. Use MP4/AVI/MOV/MKV/WebM or JPG/PNG/WebP/BMP.")
 
-    video_id = str(uuid.uuid4())
+    media_id = str(uuid.uuid4())
     suffix = Path(file.filename).suffix.lower()
-    dest = UPLOAD_DIR / f"{video_id}{suffix}"
-
+    dest = UPLOAD_DIR / f"{media_id}{suffix}"
     dest.write_bytes(await file.read())
 
-    duration = get_duration(str(dest))
-    _video_store[video_id] = {
+    if is_image(file.filename or ""):
+        duration = 0.0
+        media_type = "image"
+    else:
+        duration = get_duration(str(dest))
+        media_type = "video"
+
+    _video_store[media_id] = {
         "path": str(dest),
         "filename": file.filename,
         "duration": duration,
+        "media_type": media_type,
     }
 
-    return {"video_id": video_id, "filename": file.filename, "duration": duration}
+    return {"video_id": media_id, "filename": file.filename, "duration": duration, "media_type": media_type}
 
 
 class ChatRequest(BaseModel):
@@ -125,17 +131,20 @@ async def chat_stream(req: ChatRequest):
     if req.video_id not in _video_store:
         raise HTTPException(404, "Video not found. Upload a video first.")
 
-    video = _video_store[req.video_id]
+    media = _video_store[req.video_id]
     model_cfg = MODEL_REGISTRY.get(current_model_id() or "", {})
-    fps = model_cfg.get("fps", 1.0)
-    max_frames = model_cfg.get("max_frames", 8)
 
     loop = asyncio.get_event_loop()
     queue: asyncio.Queue = asyncio.Queue()
 
     def run():
         try:
-            frames = extract_frames(video["path"], fps=fps, max_frames=max_frames)
+            if media.get("media_type") == "image":
+                frames = load_image(media["path"])
+            else:
+                fps = model_cfg.get("fps", 1.0)
+                max_frames = model_cfg.get("max_frames", 8)
+                frames = extract_frames(media["path"], fps=fps, max_frames=max_frames)
             for token in generate_stream(frames, req.prompt, req.history or []):
                 loop.call_soon_threadsafe(queue.put_nowait, token)
         except Exception as exc:

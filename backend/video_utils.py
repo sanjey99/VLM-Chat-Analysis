@@ -1,9 +1,27 @@
 from pathlib import Path
-from decord import VideoReader, cpu
 from PIL import Image
 
 
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff"}
+VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
+SUPPORTED_EXTENSIONS = VIDEO_EXTENSIONS | IMAGE_EXTENSIONS
+
+
+def is_image(filename: str) -> bool:
+    return Path(filename).suffix.lower() in IMAGE_EXTENSIONS
+
+
+def is_supported(filename: str) -> bool:
+    return Path(filename).suffix.lower() in SUPPORTED_EXTENSIONS
+
+
+def load_image(path: str) -> list[Image.Image]:
+    return [Image.open(path).convert("RGB")]
+
+
 def extract_frames(video_path: str, fps: float = 1.0, max_frames: int = 8) -> list[Image.Image]:
+    from decord import VideoReader, cpu
+
     vr = VideoReader(video_path, ctx=cpu(0))
     total_frames = len(vr)
     video_fps = vr.get_avg_fps()
@@ -20,12 +38,7 @@ def extract_frames(video_path: str, fps: float = 1.0, max_frames: int = 8) -> li
 
 
 def get_duration(video_path: str) -> float:
+    from decord import VideoReader, cpu
+
     vr = VideoReader(video_path, ctx=cpu(0))
     return len(vr) / vr.get_avg_fps()
-
-
-SUPPORTED_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
-
-
-def is_supported(filename: str) -> bool:
-    return Path(filename).suffix.lower() in SUPPORTED_EXTENSIONS

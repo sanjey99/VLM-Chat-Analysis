@@ -9,6 +9,13 @@ import './App.css'
 export default function App() {
   const [session, setSession] = useState<VideoSession | null>(null)
   const [activeModel, setActiveModel] = useState<string | null>(null)
+  const [inputType, setInputType] = useState<'video' | 'image'>('video')
+
+  function handleModelReady(modelId: string, type: 'video' | 'image') {
+    setActiveModel(modelId)
+    setInputType(type)
+    setSession(null)
+  }
 
   return (
     <div className="app">
@@ -17,11 +24,11 @@ export default function App() {
         <p className="app__subtitle">Describe and query video scenes with AI</p>
       </header>
       <main className="app__main">
-        <ModelSelector onModelReady={setActiveModel} />
+        <ModelSelector onModelReady={handleModelReady} />
         {session ? (
           <VideoPreview session={session} onClear={() => setSession(null)} />
         ) : (
-          <VideoUpload onUpload={setSession} />
+          <VideoUpload onUpload={setSession} inputType={inputType} />
         )}
         <ChatPanel videoId={session?.videoId ?? null} modelReady={!!activeModel} />
       </main>

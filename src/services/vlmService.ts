@@ -17,6 +17,7 @@ export interface UploadResult {
   video_id: string
   filename: string
   duration: number
+  media_type: 'video' | 'image'
 }
 
 export async function uploadVideo(file: File): Promise<UploadResult> {
@@ -96,7 +97,15 @@ export async function listModels(): Promise<{
 }> {
   const res = await appFetch(`${BACKEND}/models`)
   if (!res.ok) throw new Error(`Failed to list models (${res.status})`)
-  return res.json()
+  const data = await res.json()
+  return {
+    ...data,
+    models: data.models.map((m: { id: string; label: string; input_type?: string }) => ({
+      id: m.id,
+      label: m.label,
+      inputType: (m.input_type ?? 'video') as 'video' | 'image',
+    })),
+  }
 }
 
 export async function loadModel(modelId: string): Promise<void> {

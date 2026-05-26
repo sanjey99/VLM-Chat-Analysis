@@ -9,11 +9,13 @@ export interface VideoSession {
   videoId: string
   filename: string
   duration: number
+  mediaType: 'video' | 'image'
 }
 
 export interface ModelInfo {
   id: string
   label: string
+  inputType: 'video' | 'image'
 }
 
 export interface SystemInfo {

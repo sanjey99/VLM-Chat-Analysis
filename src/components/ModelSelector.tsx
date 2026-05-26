@@ -4,7 +4,7 @@ import { getSystemInfo, listModels, loadModel } from '../services/vlmService'
 import './ModelSelector.css'
 
 interface ModelSelectorProps {
-  onModelReady: (modelId: string) => void
+  onModelReady: (modelId: string, inputType: 'video' | 'image') => void
 }
 
 export function ModelSelector({ onModelReady }: ModelSelectorProps) {
@@ -48,7 +48,8 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
         if (!info.loading && info.ready && info.current_model) {
           setActiveModel(info.current_model)
           setLoadingModel(null)
-          onModelReady(info.current_model)
+          const loaded = models.find((m) => m.id === info.current_model)
+          onModelReady(info.current_model, loaded?.inputType ?? 'video')
           clearInterval(pollRef.current!)
         }
       } catch {}

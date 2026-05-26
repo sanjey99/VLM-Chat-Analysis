@@ -2,6 +2,7 @@ MODEL_REGISTRY: dict[str, dict] = {
     "nvidia/Cosmos-Reason2-2B": {
         "label": "Cosmos-Reason2 2B — NVIDIA",
         "family": "qwen",
+        "input_type": "image",
         "use_4bit": False,
         "max_pixels": 1280 * 28 * 28,
         "fps": 1.0,
@@ -12,6 +13,7 @@ MODEL_REGISTRY: dict[str, dict] = {
     "Darwin-Project/MUSEG-3B": {
         "label": "MUSEG 3B — Video Specialist",
         "family": "qwen",
+        "input_type": "video",
         "use_4bit": False,
         "max_pixels": 1280 * 28 * 28,
         "fps": 1.5,
@@ -21,6 +23,7 @@ MODEL_REGISTRY: dict[str, dict] = {
     "nvidia/Cosmos-Reason2-8B": {
         "label": "Cosmos-Reason2 8B — NVIDIA",
         "family": "qwen",
+        "input_type": "image",
         "use_4bit": False,
         "max_pixels": 1280 * 28 * 28,
         "fps": 1.0,

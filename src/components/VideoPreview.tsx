@@ -8,14 +8,15 @@ function formatDuration(s: number): string {
 }
 
 export function VideoPreview({ session, onClear }: VideoPreviewProps) {
+  const isImage = session.mediaType === 'image'
   return (
     <div className="video-preview">
-      <span className="video-preview__icon">▶</span>
+      <span className="video-preview__icon">{isImage ? '🖼' : '▶'}</span>
       <div className="video-preview__info">
         <p className="video-preview__filename">{session.filename}</p>
-        <p className="video-preview__duration">{formatDuration(session.duration)}</p>
+        {!isImage && <p className="video-preview__duration">{formatDuration(session.duration)}</p>}
       </div>
-      <button className="video-preview__clear" onClick={onClear} aria-label="Remove video" title="Remove video">✕</button>
+      <button className="video-preview__clear" onClick={onClear} aria-label="Remove file" title="Remove file">✕</button>
     </div>
   )
 }
