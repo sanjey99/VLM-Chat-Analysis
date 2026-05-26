@@ -10,6 +10,8 @@
       "identifier": "http:allow-fetch",
       "allow": [{ "url": "http://localhost:8000/**" }]
     },
+    "http:allow-fetch-send",
+    "http:allow-fetch-read-body",
     "http:allow-fetch-cancel"
   ]
 }
