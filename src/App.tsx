@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { VideoUpload } from './components/VideoUpload'
 import { VideoPreview } from './components/VideoPreview'
 import { ChatPanel } from './components/ChatPanel'
@@ -12,11 +12,15 @@ export default function App() {
   const [inputType, setInputType] = useState<'video' | 'image'>('video')
   const [baseReady, setBaseReady] = useState(false)
 
-  function handleModelReady(modelId: string, type: 'video' | 'image') {
-    setActiveModel(modelId)
+  const handleModelReady = useCallback((modelId: string, type: 'video' | 'image') => {
+    setActiveModel((prev) => {
+      if (prev !== null && prev !== modelId) setSession(null)
+      return modelId
+    })
     setInputType(type)
-    setSession(null)
-  }
+  }, [])
+
+  const handleBaseReady = useCallback(() => setBaseReady(true), [])
 
   return (
     <div className="app">
@@ -25,7 +29,7 @@ export default function App() {
         <p className="app__subtitle">Describe and query video scenes with AI</p>
       </header>
       <main className="app__main">
-        <ModelSelector onModelReady={handleModelReady} onBaseReady={() => setBaseReady(true)} />
+        <ModelSelector onModelReady={handleModelReady} onBaseReady={handleBaseReady} />
         {session ? (
           <VideoPreview session={session} onClear={() => setSession(null)} />
         ) : (
