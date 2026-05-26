@@ -36,6 +36,7 @@ MODEL_REGISTRY: dict[str, dict] = {
 DEFAULT_MODEL = "Darwin-Project/MUSEG-3B"
 
 # Base models available for compare mode.
+# All run in full bfloat16 — compare loads them consecutively (active unloaded first).
 BASE_MODEL_REGISTRY: dict[str, dict] = {
     "Qwen/Qwen2.5-VL-2B-Instruct": {
         "label": "Qwen2.5-VL 2B",
@@ -61,7 +62,7 @@ BASE_MODEL_REGISTRY: dict[str, dict] = {
         "label": "Qwen2.5-VL 7B",
         "family": "qwen",
         "input_type": "both",
-        "use_4bit": True,
+        "use_4bit": False,
         "max_pixels": 1280 * 28 * 28,
         "fps": 1.0,
         "max_frames": 8,

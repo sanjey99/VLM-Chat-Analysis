@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Message, CompareMetrics } from '../types'
 import { MessageBubble } from './MessageBubble'
+import { MetricsChart } from './MetricsChart'
 import { ComparePanel, type ColState } from './ComparePanel'
 import { runAgentLoop } from '../services/agentLoop'
-import { streamCompare } from '../services/vlmService'
+import { streamCompare, getSystemInfo } from '../services/vlmService'
 import { saveLog } from '../services/chatStore'
 import './ChatPanel.css'
 
@@ -13,12 +14,11 @@ interface ChatPanelProps {
   mediaType: 'video' | 'image'
   modelId: string | null
   modelReady: boolean
-  baseReady: boolean
 }
 
 const EMPTY_COL: ColState = { model: '', response: '', metrics: null, streaming: false }
 
-export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, baseReady }: ChatPanelProps) {
+export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
@@ -34,6 +34,11 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
   const [rougeL, setRougeL] = useState<number | null>(null)
   const [compareStatus, setCompareStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
   const [compareError, setCompareError] = useState('')
+  const [compareHistory, setCompareHistory] = useState<Array<{ query: string; leftResponse: string; rightResponse: string }>>([])
+  const [vramSamples, setVramSamples] = useState<Array<{ t: number; gb: number }>>([])
+  const compareStartRef = useRef<number>(0)
+  const activeResponseRef = useRef('')
+  const baseResponseRef = useRef('')
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, streamingContent])
   useEffect(() => {
@@ -43,6 +48,8 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
     setLeftCol(EMPTY_COL)
     setRightCol(EMPTY_COL)
     setRougeL(null)
+    setCompareHistory([])
+    setVramSamples([])
     logIdRef.current = null
   }, [videoId])
 
@@ -52,7 +59,7 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
     if (visible[visible.length - 1].role !== 'assistant') return
     if (!logIdRef.current) logIdRef.current = crypto.randomUUID()
     saveLog({
-      id: logIdRef.current,
+      id: logIdRef.current!,
       filename,
       mediaType,
       modelId,
@@ -63,6 +70,21 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
     })
   }, [messages, videoId, modelId, filename, mediaType])
 
+  // Poll VRAM while a compare is streaming so we can show a live GPU chart.
+  useEffect(() => {
+    if (!compareMode || !isStreaming) return
+    const id = setInterval(async () => {
+      try {
+        const info = await getSystemInfo()
+        if (info.vram_used_gb != null) {
+          const t = Date.now() - compareStartRef.current
+          setVramSamples((prev) => [...prev, { t, gb: info.vram_used_gb! }])
+        }
+      } catch {}
+    }, 1500)
+    return () => clearInterval(id)
+  }, [compareMode, isStreaming])
+
   const disabled = !videoId || isStreaming || !modelReady
 
   async function handleCompare(query: string, vid: string) {
@@ -72,26 +94,43 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
     setCompareError('')
     setLeftCol(EMPTY_COL)
     setRightCol(EMPTY_COL)
+    compareStartRef.current = Date.now()
+    setVramSamples([])
+    activeResponseRef.current = ''
+    baseResponseRef.current = ''
+
+    const activeHistory = compareHistory.flatMap((h) => [
+      { role: 'user' as const, content: h.query },
+      { role: 'assistant' as const, content: h.leftResponse },
+    ])
+    const baseHistory = compareHistory.flatMap((h) => [
+      { role: 'user' as const, content: h.query },
+      { role: 'assistant' as const, content: h.rightResponse },
+    ])
 
     abortRef.current = new AbortController()
     try {
-      for await (const event of streamCompare(vid, query, abortRef.current.signal)) {
+      for await (const event of streamCompare(vid, query, activeHistory, baseHistory, abortRef.current.signal)) {
         if ('error' in event) {
           setCompareStatus('error')
           setCompareError(event.error)
           return
         }
-        if (event.phase === 'start_model') {
+        if (event.phase === 'loading_base') {
+          setRightCol({ model: event.model, response: '', metrics: null, streaming: false, loadingModel: true })
+        } else if (event.phase === 'start_model') {
           if (!firstModel) {
             firstModel = event.model
             setLeftCol({ model: event.model, response: '', metrics: null, streaming: true })
           } else {
-            setRightCol({ model: event.model, response: '', metrics: null, streaming: true })
+            setRightCol({ model: event.model, response: '', metrics: null, streaming: true, loadingModel: false })
           }
         } else if (event.phase === 'token') {
           if (event.model === firstModel) {
+            activeResponseRef.current += event.token
             setLeftCol((prev) => ({ ...prev, response: prev.response + event.token }))
           } else {
+            baseResponseRef.current += event.token
             setRightCol((prev) => ({ ...prev, response: prev.response + event.token }))
           }
         } else if (event.phase === 'model_done') {
@@ -104,6 +143,11 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
         } else if (event.phase === 'compare_done') {
           setRougeL(event.rouge_l)
           setCompareStatus('done')
+          setCompareHistory((prev) => [...prev, {
+            query,
+            leftResponse: activeResponseRef.current,
+            rightResponse: baseResponseRef.current,
+          }])
         }
       }
     } catch (err) {
@@ -158,9 +202,11 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
     setLeftCol(EMPTY_COL)
     setRightCol(EMPTY_COL)
     setRougeL(null)
+    setCompareHistory([])
+    setVramSamples([])
   }
 
-  const compareDisabled = !baseReady
+  const compareDisabled = false  // base model loaded on demand during compare
 
   return (
     <div className="chat-panel">
@@ -168,16 +214,16 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
         <div>
           <span className="chat-panel__title">{compareMode ? 'Compare Mode' : 'Video Chat'}</span>
           <span className="chat-panel__subtitle">
-            {compareMode ? 'Specialist vs Qwen2.5-VL-7B base' : 'Ask questions about your video'}
+            {compareMode ? 'Specialist vs selected base model' : 'Ask questions about your video'}
           </span>
         </div>
         <button
           className={`chat-panel__compare-btn${compareMode ? ' active' : ''}`}
           onClick={toggleCompare}
-          disabled={!modelReady || compareDisabled}
-          title={compareDisabled ? 'Base model still loading…' : 'Toggle compare mode'}
+          disabled={!modelReady}
+          title="Compare specialist vs base model (loads base on demand)"
         >
-          {compareDisabled ? '⏳ Base loading' : compareMode ? '✕ Compare' : '⇄ Compare'}
+          {compareMode ? '✕ Compare' : '⇄ Compare'}
         </button>
       </div>
 
@@ -188,6 +234,7 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
           rougeL={rougeL}
           status={compareStatus}
           error={compareError}
+          vramSamples={vramSamples}
         />
       ) : (
         <div className="chat-panel__messages">
@@ -208,6 +255,8 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
           <div ref={bottomRef} />
         </div>
       )}
+
+      {!compareMode && <MetricsChart messages={messages} />}
 
       <form className="chat-panel__form" onSubmit={handleSubmit}>
         <input className="chat-panel__input" type="text" value={input} onChange={(e) => setInput(e.target.value)}

@@ -1,8 +1,17 @@
+export interface MessageMetrics {
+  ttft_ms: number
+  total_ms: number
+  tokens_per_sec: number
+  token_count: number
+  vram_used_gb?: number | null
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant' | 'tool'
   content: string
   timestamp: number
+  metrics?: MessageMetrics
 }
 
 export interface VideoSession {
@@ -50,10 +59,12 @@ export interface CompareMetrics {
   total_ms: number
   tokens_per_sec: number
   token_count: number
+  vram_used_gb?: number | null
 }
 
 export type CompareEvent =
   | { phase: 'start_model'; model: string }
+  | { phase: 'loading_base'; model: string }
   | { phase: 'token'; model: string; token: string }
   | { phase: 'model_done'; model: string; metrics: CompareMetrics }
   | { phase: 'compare_done'; rouge_l: number }

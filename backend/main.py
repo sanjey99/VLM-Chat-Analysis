@@ -15,11 +15,11 @@ from pydantic import BaseModel
 
 from video_utils import extract_frames, get_duration, is_image, is_supported, load_image
 from vlm import (
-    current_model_id, generate_stream, generate_stream_timed, generate_base_stream_timed,
+    current_model_id, generate_stream_timed, run_compare_consecutive,
     get_base_model_id, is_loading, is_ready, is_base_loading, is_base_ready,
-    load_model, load_base_model,
+    load_model, set_base_model_id,
 )
-from config import DEFAULT_MODEL, DEFAULT_BASE_MODEL, MODEL_REGISTRY, BASE_MODEL_REGISTRY
+from config import DEFAULT_MODEL, MODEL_REGISTRY, BASE_MODEL_REGISTRY
 
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -31,12 +31,7 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Load active model first, then base model — sequential to avoid VRAM contention.
-    def load_sequence():
-        load_model(DEFAULT_MODEL)
-        load_base_model(DEFAULT_BASE_MODEL)
-
-    threading.Thread(target=load_sequence, daemon=True).start()
+    threading.Thread(target=load_model, args=(DEFAULT_MODEL,), daemon=True).start()
     yield
 
 
@@ -82,10 +77,8 @@ class LoadBaseModelRequest(BaseModel):
 async def load_base_model_endpoint(req: LoadBaseModelRequest):
     if req.base_model_id not in BASE_MODEL_REGISTRY:
         raise HTTPException(400, f"Unknown base model: {req.base_model_id}")
-    if is_base_loading():
-        raise HTTPException(409, "A base model is already loading — please wait.")
-    threading.Thread(target=load_base_model, args=(req.base_model_id,), daemon=True).start()
-    return {"status": "loading", "base_model_id": req.base_model_id}
+    set_base_model_id(req.base_model_id)
+    return {"status": "ok", "base_model_id": req.base_model_id}
 
 
 class LoadModelRequest(BaseModel):
@@ -181,8 +174,8 @@ async def chat_stream(req: ChatRequest):
                 fps = model_cfg.get("fps", 1.0)
                 max_frames = model_cfg.get("max_frames", 8)
                 frames = extract_frames(media["path"], fps=fps, max_frames=max_frames)
-            for token in generate_stream(frames, req.prompt, req.history or []):
-                loop.call_soon_threadsafe(queue.put_nowait, token)
+            for item in generate_stream_timed(frames, req.prompt, req.history or []):
+                loop.call_soon_threadsafe(queue.put_nowait, item)
         except Exception as exc:
             loop.call_soon_threadsafe(queue.put_nowait, {"error": str(exc)})
         finally:
@@ -196,10 +189,10 @@ async def chat_stream(req: ChatRequest):
             if item is None:
                 yield "data: [DONE]\n\n"
                 break
-            if isinstance(item, dict):
+            if "error" in item:
                 yield f"data: {json.dumps(item)}\n\n"
                 break
-            yield f"data: {json.dumps({'token': item})}\n\n"
+            yield f"data: {json.dumps(item)}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -207,6 +200,8 @@ async def chat_stream(req: ChatRequest):
 class CompareRequest(BaseModel):
     video_id: str
     prompt: str
+    active_history: list = []
+    base_history: list = []
 
 
 @app.post("/compare/stream")
@@ -214,21 +209,18 @@ async def compare_stream(req: CompareRequest):
     if not is_ready():
         raise HTTPException(503, "Active model not ready — try again in a moment.")
     if not is_base_ready():
-        raise HTTPException(503, "Base model (Qwen2.5-VL-7B) is still loading — please wait.")
+        raise HTTPException(503, "No base model selected — choose one in the sidebar.")
     if req.video_id not in _video_store:
         raise HTTPException(404, "Video not found. Upload a video first.")
 
     media = _video_store[req.video_id]
     model_cfg = MODEL_REGISTRY.get(current_model_id() or "", {})
-    active_id = current_model_id()
-    base_id = get_base_model_id()
 
     loop = asyncio.get_event_loop()
     queue: asyncio.Queue = asyncio.Queue()
 
     def run():
         try:
-            # Extract frames once — both models see identical input for a fair comparison.
             if media.get("media_type") == "image":
                 frames = load_image(media["path"])
             else:
@@ -236,38 +228,10 @@ async def compare_stream(req: CompareRequest):
                 max_frames = model_cfg.get("max_frames", 8)
                 frames = extract_frames(media["path"], fps=fps, max_frames=max_frames)
 
-            # --- Active model ---
-            loop.call_soon_threadsafe(queue.put_nowait, {"phase": "start_model", "model": active_id})
-            active_response = ""
-            for item in generate_stream_timed(frames, req.prompt, []):
-                if item["type"] == "token":
-                    active_response += item["token"]
-                    loop.call_soon_threadsafe(queue.put_nowait,
-                        {"phase": "token", "model": active_id, "token": item["token"]})
-                else:
-                    loop.call_soon_threadsafe(queue.put_nowait,
-                        {"phase": "model_done", "model": active_id,
-                         "metrics": {k: v for k, v in item.items() if k != "type"}})
+            def on_event(event: dict):
+                loop.call_soon_threadsafe(queue.put_nowait, event)
 
-            # --- Base model (same frames) ---
-            loop.call_soon_threadsafe(queue.put_nowait, {"phase": "start_model", "model": base_id})
-            base_response = ""
-            for item in generate_base_stream_timed(frames, req.prompt, []):
-                if item["type"] == "token":
-                    base_response += item["token"]
-                    loop.call_soon_threadsafe(queue.put_nowait,
-                        {"phase": "token", "model": base_id, "token": item["token"]})
-                else:
-                    loop.call_soon_threadsafe(queue.put_nowait,
-                        {"phase": "model_done", "model": base_id,
-                         "metrics": {k: v for k, v in item.items() if k != "type"}})
-
-            # --- ROUGE-L similarity ---
-            from rouge_score import rouge_scorer as rs
-            scorer = rs.RougeScorer(["rougeL"], use_stemmer=True)
-            score = scorer.score(active_response, base_response)
-            loop.call_soon_threadsafe(queue.put_nowait,
-                {"phase": "compare_done", "rouge_l": round(score["rougeL"].fmeasure, 3)})
+            run_compare_consecutive(frames, req.prompt, req.active_history, req.base_history, on_event)
 
         except Exception as exc:
             loop.call_soon_threadsafe(queue.put_nowait, {"error": str(exc)})

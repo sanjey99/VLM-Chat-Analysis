@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ChatLog, ChatLogMeta } from '../types'
 import { deleteLog, loadIndex, loadLog } from '../services/chatStore'
 import { MessageBubble } from './MessageBubble'
+import { MetricsChart } from './MetricsChart'
 import './HistoryPanel.css'
 
 interface HistoryPanelProps { onClose: () => void }
@@ -68,6 +69,7 @@ export function HistoryPanel({ onClose }: HistoryPanelProps) {
                 <span className="history-panel__viewer-filename">{selectedLog.filename}</span>
                 <span className="history-panel__viewer-model">{selectedLog.modelId}</span>
               </div>
+              <MetricsChart messages={selectedLog.messages} />
               <div className="history-panel__messages">
                 {selectedLog.messages
                   .filter(m => m.role !== 'tool')
