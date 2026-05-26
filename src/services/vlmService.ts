@@ -1,4 +1,4 @@
-import type { ModelInfo, SystemInfo } from '../types'
+import type { ModelInfo, SystemInfo, CompareEvent } from '../types'
 
 const BACKEND = 'http://localhost:8000'
 
@@ -79,6 +79,51 @@ export async function* streamChat(
   }
 }
 
+export async function* streamCompare(
+  videoId: string,
+  prompt: string,
+  signal?: AbortSignal,
+): AsyncGenerator<CompareEvent> {
+  const res = await appFetch(`${BACKEND}/compare/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ video_id: videoId, prompt }),
+    signal,
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail ?? `Compare failed (${res.status})`)
+  }
+  if (!res.body) throw new Error('No response body')
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop() ?? ''
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      const data = line.slice(6).trim()
+      if (data === '[DONE]') return
+      try {
+        const parsed: CompareEvent = JSON.parse(data)
+        yield parsed
+      } catch (e) {
+        if (e instanceof SyntaxError) continue
+        throw e
+      }
+    }
+  }
+}
+
 export async function checkHealth(): Promise<'ready' | 'loading' | 'offline'> {
   try {
     const res = await appFetch(`${BACKEND}/health`)
@@ -94,6 +139,9 @@ export async function listModels(): Promise<{
   models: ModelInfo[]
   current: string | null
   loading: boolean
+  base_ready: boolean
+  base_loading: boolean
+  base_model: string | null
 }> {
   const res = await appFetch(`${BACKEND}/models`)
   if (!res.ok) throw new Error(`Failed to list models (${res.status})`)

@@ -14,8 +14,12 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from video_utils import extract_frames, get_duration, is_image, is_supported, load_image
-from vlm import current_model_id, generate_stream, is_loading, is_ready, load_model
-from config import DEFAULT_MODEL, MODEL_REGISTRY
+from vlm import (
+    current_model_id, generate_stream, generate_stream_timed, generate_base_stream_timed,
+    get_base_model_id, is_loading, is_ready, is_base_loading, is_base_ready,
+    load_model, load_base_model,
+)
+from config import DEFAULT_MODEL, BASE_MODEL, MODEL_REGISTRY
 
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -27,7 +31,12 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    threading.Thread(target=load_model, args=(DEFAULT_MODEL,), daemon=True).start()
+    # Load active model first, then base model — sequential to avoid VRAM contention.
+    def load_sequence():
+        load_model(DEFAULT_MODEL)
+        load_base_model(BASE_MODEL)
+
+    threading.Thread(target=load_sequence, daemon=True).start()
     yield
 
 
@@ -55,6 +64,9 @@ async def list_models():
         ],
         "current": current_model_id(),
         "loading": is_loading(),
+        "base_ready": is_base_ready(),
+        "base_loading": is_base_loading(),
+        "base_model": get_base_model_id(),
     }
 
 
@@ -90,6 +102,9 @@ async def system_info():
         "current_model": current_model_id(),
         "loading": is_loading(),
         "ready": is_ready(),
+        "base_ready": is_base_ready(),
+        "base_loading": is_base_loading(),
+        "base_model": get_base_model_id(),
     }
 
 
@@ -167,5 +182,90 @@ async def chat_stream(req: ChatRequest):
                 yield f"data: {json.dumps(item)}\n\n"
                 break
             yield f"data: {json.dumps({'token': item})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+class CompareRequest(BaseModel):
+    video_id: str
+    prompt: str
+
+
+@app.post("/compare/stream")
+async def compare_stream(req: CompareRequest):
+    if not is_ready():
+        raise HTTPException(503, "Active model not ready — try again in a moment.")
+    if not is_base_ready():
+        raise HTTPException(503, "Base model (Qwen2.5-VL-7B) is still loading — please wait.")
+    if req.video_id not in _video_store:
+        raise HTTPException(404, "Video not found. Upload a video first.")
+
+    media = _video_store[req.video_id]
+    model_cfg = MODEL_REGISTRY.get(current_model_id() or "", {})
+    active_id = current_model_id()
+    base_id = get_base_model_id()
+
+    loop = asyncio.get_event_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    def run():
+        try:
+            # Extract frames once — both models see identical input for a fair comparison.
+            if media.get("media_type") == "image":
+                frames = load_image(media["path"])
+            else:
+                fps = model_cfg.get("fps", 1.0)
+                max_frames = model_cfg.get("max_frames", 8)
+                frames = extract_frames(media["path"], fps=fps, max_frames=max_frames)
+
+            # --- Active model ---
+            loop.call_soon_threadsafe(queue.put_nowait, {"phase": "start_model", "model": active_id})
+            active_response = ""
+            for item in generate_stream_timed(frames, req.prompt, []):
+                if item["type"] == "token":
+                    active_response += item["token"]
+                    loop.call_soon_threadsafe(queue.put_nowait,
+                        {"phase": "token", "model": active_id, "token": item["token"]})
+                else:
+                    loop.call_soon_threadsafe(queue.put_nowait,
+                        {"phase": "model_done", "model": active_id,
+                         "metrics": {k: v for k, v in item.items() if k != "type"}})
+
+            # --- Base model (same frames) ---
+            loop.call_soon_threadsafe(queue.put_nowait, {"phase": "start_model", "model": base_id})
+            base_response = ""
+            for item in generate_base_stream_timed(frames, req.prompt, []):
+                if item["type"] == "token":
+                    base_response += item["token"]
+                    loop.call_soon_threadsafe(queue.put_nowait,
+                        {"phase": "token", "model": base_id, "token": item["token"]})
+                else:
+                    loop.call_soon_threadsafe(queue.put_nowait,
+                        {"phase": "model_done", "model": base_id,
+                         "metrics": {k: v for k, v in item.items() if k != "type"}})
+
+            # --- ROUGE-L similarity ---
+            from rouge_score import rouge_scorer as rs
+            scorer = rs.RougeScorer(["rougeL"], use_stemmer=True)
+            score = scorer.score(active_response, base_response)
+            loop.call_soon_threadsafe(queue.put_nowait,
+                {"phase": "compare_done", "rouge_l": round(score["rougeL"].fmeasure, 3)})
+
+        except Exception as exc:
+            loop.call_soon_threadsafe(queue.put_nowait, {"error": str(exc)})
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    threading.Thread(target=run, daemon=True).start()
+
+    async def event_stream():
+        while True:
+            item = await queue.get()
+            if item is None:
+                yield "data: [DONE]\n\n"
+                break
+            yield f"data: {json.dumps(item)}\n\n"
+            if "error" in item:
+                break
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

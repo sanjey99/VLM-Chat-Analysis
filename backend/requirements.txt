@@ -15,3 +15,6 @@ decord>=0.6.0
 
 # Optional: 4-bit quantisation (flip USE_4BIT=True in config.py)
 bitsandbytes>=0.43.0
+
+# Compare mode — ROUGE-L similarity scoring
+rouge-score>=0.4.0

@@ -19,6 +19,11 @@ _load_lock = threading.Lock()
 _gen_lock = threading.Lock()
 _loading = False
 
+_base_adapter = None
+_base_current_id: str | None = None
+_base_load_lock = threading.Lock()
+_base_loading = False
+
 
 # ---------------------------------------------------------------------------
 # Adapters
@@ -127,8 +132,7 @@ class QwenAdapter(BaseAdapter):
 _FAMILY_MAP = {"qwen": QwenAdapter}
 
 
-def _build_adapter(model_id: str) -> BaseAdapter:
-    cfg = MODEL_REGISTRY[model_id]
+def _build_adapter(model_id: str, cfg: dict) -> BaseAdapter:
     cls = _FAMILY_MAP[cfg["family"]]
     return cls(model_id, cfg)
 
@@ -146,7 +150,8 @@ def load_model(model_id: str) -> None:
                 _current_model_id = None
 
             logger.info("Starting load: %s", model_id)
-            new_adapter = _build_adapter(model_id)
+            cfg = MODEL_REGISTRY[model_id]
+            new_adapter = _build_adapter(model_id, cfg)
             new_adapter.load()
             _adapter = new_adapter
             _current_model_id = model_id
@@ -156,6 +161,32 @@ def load_model(model_id: str) -> None:
             raise
         finally:
             _loading = False
+
+
+def load_base_model(model_id: str) -> None:
+    global _base_adapter, _base_current_id, _base_loading
+    from config import BASE_MODEL_CONFIG
+
+    with _base_load_lock:
+        _base_loading = True
+        try:
+            if _base_adapter is not None:
+                logger.info("Unloading base model %s…", _base_current_id)
+                _base_adapter.unload()
+                _base_adapter = None
+                _base_current_id = None
+
+            logger.info("Starting base model load: %s", model_id)
+            new_adapter = _build_adapter(model_id, BASE_MODEL_CONFIG)
+            new_adapter.load()
+            _base_adapter = new_adapter
+            _base_current_id = model_id
+            logger.info("Base model ready: %s", model_id)
+        except Exception:
+            logger.exception("Failed to load base model %s", model_id)
+            raise
+        finally:
+            _base_loading = False
 
 
 def is_ready() -> bool:
@@ -170,9 +201,64 @@ def current_model_id() -> str | None:
     return _current_model_id
 
 
+def is_base_ready() -> bool:
+    return _base_adapter is not None and not _base_loading
+
+
+def is_base_loading() -> bool:
+    return _base_loading
+
+
+def get_base_model_id() -> str | None:
+    return _base_current_id
+
+
 def generate_stream(
     frames: list[Image.Image],
     prompt: str,
     history: list[dict],
 ) -> Iterator[str]:
     return _adapter.generate_stream(frames, prompt, history)
+
+
+def _stream_timed(
+    adapter: BaseAdapter,
+    frames: list[Image.Image],
+    prompt: str,
+    history: list[dict],
+) -> Iterator[dict]:
+    """Wraps an adapter's generate_stream, yielding token dicts then a final metrics dict."""
+    start = time.time()
+    ttft: float | None = None
+    count = 0
+    for token in adapter.generate_stream(frames, prompt, history):
+        now = time.time()
+        if ttft is None:
+            ttft = (now - start) * 1000
+        count += 1
+        yield {"type": "token", "token": token}
+    total_ms = (time.time() - start) * 1000
+    gen_ms = max(total_ms - (ttft or 0), 0.001)
+    yield {
+        "type": "metrics",
+        "ttft_ms": round(ttft or 0),
+        "total_ms": round(total_ms),
+        "tokens_per_sec": round(count / (gen_ms / 1000), 1),
+        "token_count": count,
+    }
+
+
+def generate_stream_timed(
+    frames: list[Image.Image],
+    prompt: str,
+    history: list[dict],
+) -> Iterator[dict]:
+    return _stream_timed(_adapter, frames, prompt, history)
+
+
+def generate_base_stream_timed(
+    frames: list[Image.Image],
+    prompt: str,
+    history: list[dict],
+) -> Iterator[dict]:
+    return _stream_timed(_base_adapter, frames, prompt, history)

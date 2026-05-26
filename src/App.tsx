@@ -10,6 +10,7 @@ export default function App() {
   const [session, setSession] = useState<VideoSession | null>(null)
   const [activeModel, setActiveModel] = useState<string | null>(null)
   const [inputType, setInputType] = useState<'video' | 'image'>('video')
+  const [baseReady, setBaseReady] = useState(false)
 
   function handleModelReady(modelId: string, type: 'video' | 'image') {
     setActiveModel(modelId)
@@ -24,13 +25,13 @@ export default function App() {
         <p className="app__subtitle">Describe and query video scenes with AI</p>
       </header>
       <main className="app__main">
-        <ModelSelector onModelReady={handleModelReady} />
+        <ModelSelector onModelReady={handleModelReady} onBaseReady={() => setBaseReady(true)} />
         {session ? (
           <VideoPreview session={session} onClear={() => setSession(null)} />
         ) : (
           <VideoUpload onUpload={setSession} inputType={inputType} />
         )}
-        <ChatPanel videoId={session?.videoId ?? null} modelReady={!!activeModel} />
+        <ChatPanel videoId={session?.videoId ?? null} modelReady={!!activeModel} baseReady={baseReady} />
       </main>
     </div>
   )

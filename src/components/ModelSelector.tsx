@@ -5,36 +5,45 @@ import './ModelSelector.css'
 
 interface ModelSelectorProps {
   onModelReady: (modelId: string, inputType: 'video' | 'image') => void
+  onBaseReady: () => void
 }
 
-export function ModelSelector({ onModelReady }: ModelSelectorProps) {
+export function ModelSelector({ onModelReady, onBaseReady }: ModelSelectorProps) {
   const [models, setModels] = useState<ModelInfo[]>([])
   const [activeModel, setActiveModel] = useState<string | null>(null)
   const [loadingModel, setLoadingModel] = useState<string | null>(null)
   const [vramUsed, setVramUsed] = useState<number | null>(null)
   const [vramTotal, setVramTotal] = useState<number | null>(null)
+  const [baseStatus, setBaseStatus] = useState<'loading' | 'ready' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const baseRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchModels = useCallback(() => {
     setError(null)
     listModels()
-      .then(({ models, current, loading }) => {
+      .then(({ models, current, loading, base_ready, base_loading }) => {
         setModels(models)
         setActiveModel(current)
-        // current_model_id is null while auto-loading on startup; poll anyway
         if (loading) setLoadingModel(current ?? '__startup__')
+        // Sync initial base model state
+        if (base_ready) {
+          setBaseStatus('ready')
+          onBaseReady()
+        } else if (base_loading || loading) {
+          setBaseStatus('loading')
+        }
       })
       .catch((err) => {
         console.error('listModels failed:', err)
         const msg = err instanceof Error ? err.message : String(err)
         setError(`Could not reach backend: ${msg}`)
       })
-  }, [])
+  }, [onBaseReady])
 
   useEffect(() => { fetchModels() }, [fetchModels])
 
-  // Poll system/info while a model is loading
+  // Poll system/info while an active model is loading
   useEffect(() => {
     if (!loadingModel) {
       if (pollRef.current) clearInterval(pollRef.current)
@@ -59,6 +68,26 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [loadingModel, onModelReady])
 
+  // Poll for base model readiness independently of active model loading
+  useEffect(() => {
+    if (baseStatus === 'ready') return
+
+    baseRef.current = setInterval(async () => {
+      try {
+        const info = await getSystemInfo()
+        if (info.base_ready) {
+          setBaseStatus('ready')
+          onBaseReady()
+          clearInterval(baseRef.current!)
+        } else if (info.base_loading) {
+          setBaseStatus('loading')
+        }
+      } catch {}
+    }, 2000)
+
+    return () => { if (baseRef.current) clearInterval(baseRef.current) }
+  }, [baseStatus, onBaseReady])
+
   async function handleSelect(modelId: string) {
     if (modelId === activeModel || loadingModel) return
     setError(null)
@@ -75,11 +104,19 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
     <div className="model-selector">
       <div className="model-selector__header">
         <span className="model-selector__label">Model</span>
-        {vramTotal !== null && (
-          <span className="model-selector__vram">
-            VRAM {vramUsed ?? '—'} / {vramTotal} GB
-          </span>
-        )}
+        <div className="model-selector__header-right">
+          {baseStatus === 'loading' && (
+            <span className="model-selector__base-status">Base loading…</span>
+          )}
+          {baseStatus === 'ready' && (
+            <span className="model-selector__base-status model-selector__base-status--ready">Base ready</span>
+          )}
+          {vramTotal !== null && (
+            <span className="model-selector__vram">
+              VRAM {vramUsed ?? '—'} / {vramTotal} GB
+            </span>
+          )}
+        </div>
       </div>
       <div className="model-selector__options">
         {models.map((m) => {
