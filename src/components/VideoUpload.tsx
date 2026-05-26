@@ -26,6 +26,7 @@ export function VideoUpload({ onUpload, inputType = 'video' }: VideoUploadProps)
 
   async function handleFile(file: File) {
     setError(null); setUploading(true)
+    const localUrl = URL.createObjectURL(file)
     try {
       const result = await uploadVideo(file)
       onUpload({
@@ -33,8 +34,12 @@ export function VideoUpload({ onUpload, inputType = 'video' }: VideoUploadProps)
         filename: result.filename,
         duration: result.duration,
         mediaType: result.media_type,
+        localUrl,
       })
-    } catch (err) { setError((err as Error).message) }
+    } catch (err) {
+      URL.revokeObjectURL(localUrl)
+      setError((err as Error).message)
+    }
     finally { setUploading(false) }
   }
 

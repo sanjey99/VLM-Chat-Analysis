@@ -10,6 +10,7 @@ export interface VideoSession {
   filename: string
   duration: number
   mediaType: 'video' | 'image'
+  localUrl?: string
 }
 
 export interface ModelInfo {
