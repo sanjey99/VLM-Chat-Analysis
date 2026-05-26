@@ -21,25 +21,29 @@ export function loadLog(id: string): ChatLog | null {
 }
 
 export function saveLog(log: ChatLog): void {
-  localStorage.setItem(LOG_PREFIX + log.id, JSON.stringify(log))
-  const index = loadIndex()
-  const i = index.findIndex(m => m.id === log.id)
-  const meta: ChatLogMeta = {
-    id: log.id,
-    filename: log.filename,
-    mediaType: log.mediaType,
-    modelId: log.modelId,
-    createdAt: log.createdAt,
-    updatedAt: log.updatedAt,
-    messageCount: log.messages.filter(m => m.role !== 'tool').length,
-  }
-  if (i >= 0) { index[i] = meta } else {
-    index.unshift(meta)
-    if (index.length > MAX_LOGS) {
-      for (const m of index.splice(MAX_LOGS)) localStorage.removeItem(LOG_PREFIX + m.id)
+  try {
+    localStorage.setItem(LOG_PREFIX + log.id, JSON.stringify(log))
+    const index = loadIndex()
+    const i = index.findIndex(m => m.id === log.id)
+    const meta: ChatLogMeta = {
+      id: log.id,
+      filename: log.filename,
+      mediaType: log.mediaType,
+      modelId: log.modelId,
+      createdAt: log.createdAt,
+      updatedAt: log.updatedAt,
+      messageCount: log.messages.filter(m => m.role !== 'tool').length,
     }
+    if (i >= 0) { index[i] = meta } else {
+      index.unshift(meta)
+      if (index.length > MAX_LOGS) {
+        for (const m of index.splice(MAX_LOGS)) localStorage.removeItem(LOG_PREFIX + m.id)
+      }
+    }
+    saveIndex(index)
+  } catch (err) {
+    console.error('[chatStore] saveLog failed:', err)
   }
-  saveIndex(index)
 }
 
 export function deleteLog(id: string): void {

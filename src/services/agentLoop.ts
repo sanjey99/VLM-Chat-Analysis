@@ -1,4 +1,4 @@
-import type { Message } from '../types'
+import type { Message, MessageMetrics } from '../types'
 import { streamChat } from './vlmService'
 
 export interface AgentLoopCallbacks {
@@ -28,11 +28,16 @@ export async function runAgentLoop(
     .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
   let fullText = ''
+  let metrics: MessageMetrics | undefined
 
   try {
-    for await (const token of streamChat(videoId, userInput, chatHistory, signal)) {
-      fullText += token
-      callbacks.onToken(token)
+    for await (const event of streamChat(videoId, userInput, chatHistory, signal)) {
+      if (event.type === 'token') {
+        fullText += event.token
+        callbacks.onToken(event.token)
+      } else if (event.type === 'metrics') {
+        metrics = event.metrics
+      }
     }
   } catch (err) {
     if ((err as Error).name !== 'AbortError') {
@@ -46,6 +51,7 @@ export async function runAgentLoop(
     role: 'assistant',
     content: fullText,
     timestamp: Date.now(),
+    metrics,
   }
   callbacks.onAssistantMessage(assistantMessage)
 

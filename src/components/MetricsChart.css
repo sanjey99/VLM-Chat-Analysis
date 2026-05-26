@@ -1,0 +1,41 @@
+.metrics-chart {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.metrics-chart__header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: var(--space-1);
+}
+.metrics-chart__title {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-muted);
+}
+.metrics-chart__peak {
+  font-size: 10px; color: var(--accent); font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.metrics-chart__scroll {
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.metrics-chart__scroll::-webkit-scrollbar { height: 3px; }
+.metrics-chart__scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.metrics-chart__svg { display: block; overflow: visible; }
+
+.metrics-chart__bar {
+  fill: var(--accent);
+  opacity: 0.7;
+  transition: opacity 0.1s;
+  cursor: default;
+}
+.metrics-chart__bar:hover { opacity: 1; }
+
+.metrics-chart__tick {
+  font-size: 9px;
+  font-family: var(--font-ui);
+  fill: var(--text-muted);
+}

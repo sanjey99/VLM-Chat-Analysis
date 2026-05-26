@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Message, CompareMetrics } from '../types'
 import { MessageBubble } from './MessageBubble'
+import { MetricsChart } from './MetricsChart'
 import { ComparePanel, type ColState } from './ComparePanel'
 import { runAgentLoop } from '../services/agentLoop'
 import { streamCompare } from '../services/vlmService'
@@ -52,7 +53,7 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
     if (visible[visible.length - 1].role !== 'assistant') return
     if (!logIdRef.current) logIdRef.current = crypto.randomUUID()
     saveLog({
-      id: logIdRef.current,
+      id: logIdRef.current!,
       filename,
       mediaType,
       modelId,
@@ -208,6 +209,8 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
           <div ref={bottomRef} />
         </div>
       )}
+
+      {!compareMode && <MetricsChart messages={messages} />}
 
       <form className="chat-panel__form" onSubmit={handleSubmit}>
         <input className="chat-panel__input" type="text" value={input} onChange={(e) => setInput(e.target.value)}

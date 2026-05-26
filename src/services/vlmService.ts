@@ -1,4 +1,8 @@
-import type { ModelInfo, SystemInfo, CompareEvent } from '../types'
+import type { ModelInfo, SystemInfo, CompareEvent, MessageMetrics } from '../types'
+
+export type ChatStreamEvent =
+  | { type: 'token'; token: string }
+  | { type: 'metrics'; metrics: MessageMetrics }
 
 const BACKEND = 'http://localhost:8000'
 
@@ -37,7 +41,7 @@ export async function* streamChat(
   prompt: string,
   history: Array<{ role: 'user' | 'assistant'; content: string }>,
   signal?: AbortSignal
-): AsyncGenerator<string> {
+): AsyncGenerator<ChatStreamEvent> {
   const res = await appFetch(`${BACKEND}/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -70,7 +74,12 @@ export async function* streamChat(
       try {
         const parsed = JSON.parse(data)
         if (parsed.error) throw new Error(parsed.error)
-        if (parsed.token) yield parsed.token
+        if (parsed.type === 'metrics') {
+          const { ttft_ms, total_ms, tokens_per_sec, token_count, vram_used_gb } = parsed
+          yield { type: 'metrics', metrics: { ttft_ms, total_ms, tokens_per_sec, token_count, vram_used_gb } }
+        } else if (parsed.type === 'token' && parsed.token) {
+          yield { type: 'token', token: parsed.token }
+        }
       } catch (e) {
         if (e instanceof SyntaxError) continue
         throw e

@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from video_utils import extract_frames, get_duration, is_image, is_supported, load_image
 from vlm import (
-    current_model_id, generate_stream, generate_stream_timed, generate_base_stream_timed,
+    current_model_id, generate_stream_timed, generate_base_stream_timed,
     get_base_model_id, is_loading, is_ready, is_base_loading, is_base_ready,
     load_model, load_base_model,
 )
@@ -181,8 +181,8 @@ async def chat_stream(req: ChatRequest):
                 fps = model_cfg.get("fps", 1.0)
                 max_frames = model_cfg.get("max_frames", 8)
                 frames = extract_frames(media["path"], fps=fps, max_frames=max_frames)
-            for token in generate_stream(frames, req.prompt, req.history or []):
-                loop.call_soon_threadsafe(queue.put_nowait, token)
+            for item in generate_stream_timed(frames, req.prompt, req.history or []):
+                loop.call_soon_threadsafe(queue.put_nowait, item)
         except Exception as exc:
             loop.call_soon_threadsafe(queue.put_nowait, {"error": str(exc)})
         finally:
@@ -196,10 +196,10 @@ async def chat_stream(req: ChatRequest):
             if item is None:
                 yield "data: [DONE]\n\n"
                 break
-            if isinstance(item, dict):
+            if "error" in item:
                 yield f"data: {json.dumps(item)}\n\n"
                 break
-            yield f"data: {json.dumps({'token': item})}\n\n"
+            yield f"data: {json.dumps(item)}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 

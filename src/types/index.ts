@@ -1,8 +1,17 @@
+export interface MessageMetrics {
+  ttft_ms: number
+  total_ms: number
+  tokens_per_sec: number
+  token_count: number
+  vram_used_gb?: number | null
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant' | 'tool'
   content: string
   timestamp: number
+  metrics?: MessageMetrics
 }
 
 export interface VideoSession {

@@ -240,12 +240,19 @@ def _stream_timed(
         yield {"type": "token", "token": token}
     total_ms = (time.time() - start) * 1000
     gen_ms = max(total_ms - (ttft or 0), 0.001)
+    vram_used_gb = None
+    if torch.cuda.is_available():
+        try:
+            vram_used_gb = round(torch.cuda.memory_allocated(0) / 1024 ** 3, 2)
+        except Exception:
+            pass
     yield {
         "type": "metrics",
         "ttft_ms": round(ttft or 0),
         "total_ms": round(total_ms),
         "tokens_per_sec": round(count / (gen_ms / 1000), 1),
         "token_count": count,
+        "vram_used_gb": vram_used_gb,
     }
 
 
