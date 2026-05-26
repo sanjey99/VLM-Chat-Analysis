@@ -22,7 +22,8 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
       .then(({ models, current, loading }) => {
         setModels(models)
         setActiveModel(current)
-        if (loading && current) setLoadingModel(current)
+        // current_model_id is null while auto-loading on startup; poll anyway
+        if (loading) setLoadingModel(current ?? '__startup__')
       })
       .catch((err) => {
         console.error('listModels failed:', err)
