@@ -35,20 +35,42 @@ MODEL_REGISTRY: dict[str, dict] = {
 
 DEFAULT_MODEL = "Darwin-Project/MUSEG-3B"
 
-# Base model used for compare mode — loaded co-resident alongside the active model.
-# 4-bit quantisation keeps it at ~8 GB so it fits with any active model on 24 GB VRAM.
-# Accepts both video frames and images, making it a universal baseline.
-BASE_MODEL = "Qwen/Qwen2.5-VL-7B-Instruct"
-BASE_MODEL_CONFIG: dict = {
-    "label": "Qwen2.5-VL 7B — Base",
-    "family": "qwen",
-    "input_type": "both",
-    "use_4bit": True,
-    "max_pixels": 1280 * 28 * 28,
-    "fps": 1.0,
-    "max_frames": 8,
-    "max_new_tokens": 1024,
+# Base models available for compare mode.
+# 2B/3B run in full precision; 7B uses 4-bit to stay within 24 GB alongside the active model.
+BASE_MODEL_REGISTRY: dict[str, dict] = {
+    "Qwen/Qwen2.5-VL-2B-Instruct": {
+        "label": "Qwen2.5-VL 2B",
+        "family": "qwen",
+        "input_type": "both",
+        "use_4bit": False,
+        "max_pixels": 1280 * 28 * 28,
+        "fps": 1.0,
+        "max_frames": 8,
+        "max_new_tokens": 1024,
+    },
+    "Qwen/Qwen2.5-VL-3B-Instruct": {
+        "label": "Qwen2.5-VL 3B",
+        "family": "qwen",
+        "input_type": "both",
+        "use_4bit": False,
+        "max_pixels": 1280 * 28 * 28,
+        "fps": 1.0,
+        "max_frames": 8,
+        "max_new_tokens": 1024,
+    },
+    "Qwen/Qwen2.5-VL-7B-Instruct": {
+        "label": "Qwen2.5-VL 7B",
+        "family": "qwen",
+        "input_type": "both",
+        "use_4bit": True,
+        "max_pixels": 1280 * 28 * 28,
+        "fps": 1.0,
+        "max_frames": 8,
+        "max_new_tokens": 1024,
+    },
 }
+
+DEFAULT_BASE_MODEL = "Qwen/Qwen2.5-VL-7B-Instruct"
 
 # Global fallback — per-model max_new_tokens takes precedence
 MAX_NEW_TOKENS = 512

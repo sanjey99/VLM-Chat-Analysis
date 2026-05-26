@@ -23,6 +23,7 @@ export default function App() {
   }, [])
 
   const handleBaseReady = useCallback(() => setBaseReady(true), [])
+  const handleBaseLoading = useCallback(() => setBaseReady(false), [])
 
   return (
     <div className="app">
@@ -36,7 +37,7 @@ export default function App() {
         </button>
       </header>
       <main className="app__main">
-        <ModelSelector onModelReady={handleModelReady} onBaseReady={handleBaseReady} />
+        <ModelSelector onModelReady={handleModelReady} onBaseReady={handleBaseReady} onBaseLoading={handleBaseLoading} />
         {session ? (
           <VideoPreview session={session} onClear={() => setSession(null)} />
         ) : (

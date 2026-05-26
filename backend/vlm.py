@@ -165,7 +165,7 @@ def load_model(model_id: str) -> None:
 
 def load_base_model(model_id: str) -> None:
     global _base_adapter, _base_current_id, _base_loading
-    from config import BASE_MODEL_CONFIG
+    from config import BASE_MODEL_REGISTRY
 
     with _base_load_lock:
         _base_loading = True
@@ -177,7 +177,8 @@ def load_base_model(model_id: str) -> None:
                 _base_current_id = None
 
             logger.info("Starting base model load: %s", model_id)
-            new_adapter = _build_adapter(model_id, BASE_MODEL_CONFIG)
+            cfg = BASE_MODEL_REGISTRY[model_id]
+            new_adapter = _build_adapter(model_id, cfg)
             new_adapter.load()
             _base_adapter = new_adapter
             _base_current_id = model_id

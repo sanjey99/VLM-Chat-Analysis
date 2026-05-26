@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { VideoSession } from '../types'
 import './VideoPreview.css'
 
@@ -10,6 +10,11 @@ function formatDuration(s: number): string {
 
 export function VideoPreview({ session, onClear }: VideoPreviewProps) {
   const isImage = session.mediaType === 'image'
+  const [videoError, setVideoError] = useState(false)
+
+  useEffect(() => {
+    setVideoError(false)
+  }, [session.localUrl])
 
   useEffect(() => {
     return () => { if (session.localUrl) URL.revokeObjectURL(session.localUrl) }
@@ -21,7 +26,15 @@ export function VideoPreview({ session, onClear }: VideoPreviewProps) {
         {session.localUrl ? (
           isImage
             ? <img src={session.localUrl} alt={session.filename} className="video-preview__asset" />
-            : <video src={session.localUrl} className="video-preview__asset" controls muted playsInline />
+            : videoError
+              ? (
+                <div className="video-preview__unsupported">
+                  <span className="video-preview__unsupported-icon">▶</span>
+                  <p>Preview unavailable</p>
+                  <p className="video-preview__unsupported-hint">Format not supported for playback — analysis will still work</p>
+                </div>
+              )
+              : <video src={session.localUrl} className="video-preview__asset" controls muted playsInline onError={() => setVideoError(true)} />
         ) : (
           <span className="video-preview__placeholder">{isImage ? '🖼' : '▶'}</span>
         )}

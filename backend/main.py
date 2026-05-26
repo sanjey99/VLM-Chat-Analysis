@@ -19,7 +19,7 @@ from vlm import (
     get_base_model_id, is_loading, is_ready, is_base_loading, is_base_ready,
     load_model, load_base_model,
 )
-from config import DEFAULT_MODEL, BASE_MODEL, MODEL_REGISTRY
+from config import DEFAULT_MODEL, DEFAULT_BASE_MODEL, MODEL_REGISTRY, BASE_MODEL_REGISTRY
 
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
     # Load active model first, then base model — sequential to avoid VRAM contention.
     def load_sequence():
         load_model(DEFAULT_MODEL)
-        load_base_model(BASE_MODEL)
+        load_base_model(DEFAULT_BASE_MODEL)
 
     threading.Thread(target=load_sequence, daemon=True).start()
     yield
@@ -67,7 +67,25 @@ async def list_models():
         "base_ready": is_base_ready(),
         "base_loading": is_base_loading(),
         "base_model": get_base_model_id(),
+        "base_models": [
+            {"id": mid, "label": cfg["label"]}
+            for mid, cfg in BASE_MODEL_REGISTRY.items()
+        ],
     }
+
+
+class LoadBaseModelRequest(BaseModel):
+    base_model_id: str
+
+
+@app.post("/load-base-model")
+async def load_base_model_endpoint(req: LoadBaseModelRequest):
+    if req.base_model_id not in BASE_MODEL_REGISTRY:
+        raise HTTPException(400, f"Unknown base model: {req.base_model_id}")
+    if is_base_loading():
+        raise HTTPException(409, "A base model is already loading — please wait.")
+    threading.Thread(target=load_base_model, args=(req.base_model_id,), daemon=True).start()
+    return {"status": "loading", "base_model_id": req.base_model_id}
 
 
 class LoadModelRequest(BaseModel):

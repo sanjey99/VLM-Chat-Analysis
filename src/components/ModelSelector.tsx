@@ -1,19 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ModelInfo } from '../types'
-import { getSystemInfo, listModels, loadModel } from '../services/vlmService'
+import { getSystemInfo, listModels, loadModel, loadBaseModel } from '../services/vlmService'
 import './ModelSelector.css'
 
 interface ModelSelectorProps {
   onModelReady: (modelId: string, inputType: 'video' | 'image') => void
   onBaseReady: () => void
+  onBaseLoading: () => void
 }
 
-export function ModelSelector({ onModelReady, onBaseReady }: ModelSelectorProps) {
+export function ModelSelector({ onModelReady, onBaseReady, onBaseLoading }: ModelSelectorProps) {
   const [models, setModels] = useState<ModelInfo[]>([])
   const [activeModel, setActiveModel] = useState<string | null>(null)
   const [loadingModel, setLoadingModel] = useState<string | null>(null)
   const [vramUsed, setVramUsed] = useState<number | null>(null)
   const [vramTotal, setVramTotal] = useState<number | null>(null)
+  const [baseModels, setBaseModels] = useState<{ id: string; label: string }[]>([])
+  const [activeBaseModel, setActiveBaseModel] = useState<string | null>(null)
+  const [loadingBaseModel, setLoadingBaseModel] = useState<string | null>(null)
   const [baseStatus, setBaseStatus] = useState<'loading' | 'ready' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -22,16 +26,17 @@ export function ModelSelector({ onModelReady, onBaseReady }: ModelSelectorProps)
   const fetchModels = useCallback(() => {
     setError(null)
     listModels()
-      .then(({ models, current, loading, base_ready, base_loading }) => {
+      .then(({ models, current, loading, base_ready, base_loading, base_model, base_models }) => {
         setModels(models)
         setActiveModel(current)
+        setBaseModels(base_models)
+        if (base_model) setActiveBaseModel(base_model)
         if (loading) {
           setLoadingModel(current ?? '__startup__')
         } else if (current) {
           const loaded = models.find((m) => m.id === current)
           onModelReady(current, loaded?.inputType ?? 'video')
         }
-        // Sync initial base model state
         if (base_ready) {
           setBaseStatus('ready')
           onBaseReady()
@@ -73,15 +78,19 @@ export function ModelSelector({ onModelReady, onBaseReady }: ModelSelectorProps)
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [loadingModel, onModelReady])
 
-  // Poll for base model readiness independently of active model loading
+  // Poll for base model readiness
   useEffect(() => {
     if (baseStatus === 'ready') return
 
     baseRef.current = setInterval(async () => {
       try {
         const info = await getSystemInfo()
+        if (info.vram_used_gb !== null) setVramUsed(info.vram_used_gb)
+        if (info.vram_total_gb !== null) setVramTotal(info.vram_total_gb)
         if (info.base_ready) {
           setBaseStatus('ready')
+          if (info.base_model) setActiveBaseModel(info.base_model)
+          setLoadingBaseModel(null)
           onBaseReady()
           clearInterval(baseRef.current!)
         } else if (info.base_loading) {
@@ -105,17 +114,28 @@ export function ModelSelector({ onModelReady, onBaseReady }: ModelSelectorProps)
     }
   }
 
+  async function handleBaseSelect(modelId: string) {
+    if (modelId === activeBaseModel || loadingBaseModel) return
+    setError(null)
+    setLoadingBaseModel(modelId)
+    setBaseStatus('loading')
+    onBaseLoading()
+    try {
+      await loadBaseModel(modelId)
+    } catch (err) {
+      setError((err as Error).message)
+      setLoadingBaseModel(null)
+      // old base model still resident — restore ready state
+      setBaseStatus('ready')
+      onBaseReady()
+    }
+  }
+
   return (
     <div className="model-selector">
       <div className="model-selector__header">
         <span className="model-selector__label">Model</span>
         <div className="model-selector__header-right">
-          {baseStatus === 'loading' && (
-            <span className="model-selector__base-status">Base loading…</span>
-          )}
-          {baseStatus === 'ready' && (
-            <span className="model-selector__base-status model-selector__base-status--ready">Base ready</span>
-          )}
           {vramTotal !== null && (
             <span className="model-selector__vram">
               VRAM {vramUsed ?? '—'} / {vramTotal} GB
@@ -141,6 +161,41 @@ export function ModelSelector({ onModelReady, onBaseReady }: ModelSelectorProps)
           )
         })}
       </div>
+
+      {baseModels.length > 0 && (
+        <>
+          <div className="model-selector__header">
+            <span className="model-selector__label">Base model (compare)</span>
+            <div className="model-selector__header-right">
+              {baseStatus === 'loading' && (
+                <span className="model-selector__base-status">Loading…</span>
+              )}
+              {baseStatus === 'ready' && (
+                <span className="model-selector__base-status model-selector__base-status--ready">Ready</span>
+              )}
+            </div>
+          </div>
+          <div className="model-selector__options">
+            {baseModels.map((m) => {
+              const isActive = m.id === activeBaseModel && !loadingBaseModel
+              const isLoading = m.id === loadingBaseModel
+              return (
+                <button
+                  key={m.id}
+                  className={`model-selector__btn model-selector__btn--base${isActive ? ' model-selector__btn--active' : ''}${isLoading ? ' model-selector__btn--loading' : ''}`}
+                  onClick={() => handleBaseSelect(m.id)}
+                  disabled={!!loadingBaseModel}
+                  title={m.id}
+                >
+                  {isLoading && <span className="model-selector__spinner" />}
+                  {m.label}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+
       {error && (
         <div className="model-selector__error-row">
           <p className="model-selector__error">{error}</p>

@@ -42,3 +42,12 @@
 .video-preview__duration { font-size: 11px; color: var(--text-muted); margin: 1px 0 0; }
 .video-preview__clear { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: var(--space-1) var(--space-2); border-radius: 4px; flex-shrink: 0; transition: color 0.15s, background 0.15s; }
 .video-preview__clear:hover { color: var(--text-primary); background: var(--bg-input); }
+
+.video-preview__unsupported {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; padding: var(--space-6);
+  color: var(--text-muted); text-align: center;
+}
+.video-preview__unsupported-icon { font-size: 24px; opacity: 0.3; }
+.video-preview__unsupported p { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin: 0; }
+.video-preview__unsupported-hint { font-size: 11px !important; color: var(--text-muted) !important; font-weight: 400 !important; }

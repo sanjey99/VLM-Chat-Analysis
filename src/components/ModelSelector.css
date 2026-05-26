@@ -67,3 +67,5 @@
   white-space: nowrap;
 }
 .model-selector__retry:hover { border-color: var(--accent); color: var(--accent); }
+
+.model-selector__btn--base { font-size: 11px; }

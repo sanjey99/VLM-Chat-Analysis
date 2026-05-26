@@ -142,6 +142,7 @@ export async function listModels(): Promise<{
   base_ready: boolean
   base_loading: boolean
   base_model: string | null
+  base_models: { id: string; label: string }[]
 }> {
   const res = await appFetch(`${BACKEND}/models`)
   if (!res.ok) throw new Error(`Failed to list models (${res.status})`)
@@ -153,6 +154,19 @@ export async function listModels(): Promise<{
       label: m.label,
       inputType: (m.input_type ?? 'video') as 'video' | 'image',
     })),
+    base_models: data.base_models ?? [],
+  }
+}
+
+export async function loadBaseModel(baseModelId: string): Promise<void> {
+  const res = await appFetch(`${BACKEND}/load-base-model`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base_model_id: baseModelId }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail ?? `Load failed (${res.status})`)
   }
 }
 
