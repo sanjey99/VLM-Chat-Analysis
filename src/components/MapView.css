@@ -1,9 +1,0 @@
-.map-view {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-
-.map-view canvas {
-  outline: none;
-}

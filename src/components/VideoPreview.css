@@ -1,0 +1,7 @@
+.video-preview { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px; }
+.video-preview__icon { font-size: 18px; color: var(--accent); flex-shrink: 0; }
+.video-preview__info { flex: 1; min-width: 0; }
+.video-preview__filename { font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.video-preview__duration { font-size: 11px; color: var(--text-muted); margin: 2px 0 0; }
+.video-preview__clear { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding: var(--space-1) var(--space-2); border-radius: 4px; flex-shrink: 0; transition: color 0.15s, background 0.15s; }
+.video-preview__clear:hover { color: var(--text-primary); background: var(--bg-input); }

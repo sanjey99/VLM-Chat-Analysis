@@ -1,0 +1,17 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+
+# VLM dependencies
+transformers>=4.52.0
+torch>=2.3.0
+torchvision>=0.18.0
+accelerate>=0.30.0
+qwen-vl-utils>=0.0.8
+Pillow>=10.0.0
+
+# Video frame extraction
+decord>=0.6.0
+
+# Optional: 4-bit quantisation (flip USE_4BIT=True in config.py)
+bitsandbytes>=0.43.0
