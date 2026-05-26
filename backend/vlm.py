@@ -1,5 +1,7 @@
 import gc
+import logging
 import threading
+import time
 from abc import ABC, abstractmethod
 from typing import Iterator
 
@@ -8,6 +10,8 @@ from PIL import Image
 from transformers import AutoProcessor, TextIteratorStreamer
 
 from config import MODEL_REGISTRY, MAX_NEW_TOKENS
+
+logger = logging.getLogger(__name__)
 
 _adapter = None
 _current_model_id: str | None = None
@@ -61,18 +65,22 @@ class QwenAdapter(BaseAdapter):
     def load(self) -> None:
         from transformers import AutoModelForImageTextToText
 
-        # Qwen3-VL uses the same class as Qwen2.5-VL in current transformers
+        logger.info("[%s] Loading processor…", self.model_id)
         self.processor = AutoProcessor.from_pretrained(
             self.model_id,
             max_pixels=self.cfg["max_pixels"],
         )
+        logger.info("[%s] Loading model weights…", self.model_id)
+        t0 = time.time()
         self.model = AutoModelForImageTextToText.from_pretrained(
             self.model_id,
             dtype=None if self.cfg["use_4bit"] else torch.bfloat16,
             quantization_config=self._quantization_config(),
             device_map="auto",
         )
+        logger.info("[%s] Weights loaded in %.1fs, setting eval mode…", self.model_id, time.time() - t0)
         self.model.eval()
+        logger.info("[%s] Ready.", self.model_id)
 
     def generate_stream(
         self,
@@ -132,14 +140,20 @@ def load_model(model_id: str) -> None:
         _loading = True
         try:
             if _adapter is not None:
+                logger.info("Unloading %s…", _current_model_id)
                 _adapter.unload()
                 _adapter = None
                 _current_model_id = None
 
+            logger.info("Starting load: %s", model_id)
             new_adapter = _build_adapter(model_id)
             new_adapter.load()
             _adapter = new_adapter
             _current_model_id = model_id
+            logger.info("Model ready: %s", model_id)
+        except Exception:
+            logger.exception("Failed to load model %s", model_id)
+            raise
         finally:
             _loading = False
 

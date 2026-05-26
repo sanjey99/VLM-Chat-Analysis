@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import threading
 import uuid
 from contextlib import asynccontextmanager
@@ -21,6 +22,8 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 _video_store: dict[str, dict] = {}
 
+
+logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
