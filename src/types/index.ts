@@ -63,6 +63,7 @@ export interface CompareMetrics {
 
 export type CompareEvent =
   | { phase: 'start_model'; model: string }
+  | { phase: 'loading_base'; model: string }
   | { phase: 'token'; model: string; token: string }
   | { phase: 'model_done'; model: string; metrics: CompareMetrics }
   | { phase: 'compare_done'; rouge_l: number }

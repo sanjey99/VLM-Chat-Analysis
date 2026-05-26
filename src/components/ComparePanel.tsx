@@ -6,6 +6,7 @@ export interface ColState {
   response: string
   metrics: CompareMetrics | null
   streaming: boolean
+  loadingModel?: boolean
 }
 
 interface ComparePanelProps {
@@ -39,7 +40,9 @@ function ModelCol({ col }: { col: ColState }) {
       <div className="compare-col__response">
         {col.response
           ? col.response
-          : <span className="compare-col__waiting">{col.streaming ? 'Generating…' : 'Waiting…'}</span>}
+          : <span className="compare-col__waiting">
+              {col.loadingModel ? 'Loading model…' : col.streaming ? 'Generating…' : 'Waiting…'}
+            </span>}
       </div>
       {col.metrics && (
         <div className="compare-col__metrics">

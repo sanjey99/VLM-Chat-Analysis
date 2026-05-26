@@ -14,12 +14,11 @@ interface ChatPanelProps {
   mediaType: 'video' | 'image'
   modelId: string | null
   modelReady: boolean
-  baseReady: boolean
 }
 
 const EMPTY_COL: ColState = { model: '', response: '', metrics: null, streaming: false }
 
-export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, baseReady }: ChatPanelProps) {
+export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
@@ -82,12 +81,14 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
           setCompareError(event.error)
           return
         }
-        if (event.phase === 'start_model') {
+        if (event.phase === 'loading_base') {
+          setRightCol({ model: event.model, response: '', metrics: null, streaming: false, loadingModel: true })
+        } else if (event.phase === 'start_model') {
           if (!firstModel) {
             firstModel = event.model
             setLeftCol({ model: event.model, response: '', metrics: null, streaming: true })
           } else {
-            setRightCol({ model: event.model, response: '', metrics: null, streaming: true })
+            setRightCol({ model: event.model, response: '', metrics: null, streaming: true, loadingModel: false })
           }
         } else if (event.phase === 'token') {
           if (event.model === firstModel) {
@@ -161,7 +162,7 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
     setRougeL(null)
   }
 
-  const compareDisabled = !baseReady
+  const compareDisabled = false  // base model loaded on demand during compare
 
   return (
     <div className="chat-panel">
@@ -169,16 +170,16 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
         <div>
           <span className="chat-panel__title">{compareMode ? 'Compare Mode' : 'Video Chat'}</span>
           <span className="chat-panel__subtitle">
-            {compareMode ? 'Specialist vs Qwen2.5-VL-7B base' : 'Ask questions about your video'}
+            {compareMode ? 'Specialist vs selected base model' : 'Ask questions about your video'}
           </span>
         </div>
         <button
           className={`chat-panel__compare-btn${compareMode ? ' active' : ''}`}
           onClick={toggleCompare}
-          disabled={!modelReady || compareDisabled}
-          title={compareDisabled ? 'Base model still loading…' : 'Toggle compare mode'}
+          disabled={!modelReady}
+          title="Compare specialist vs base model (loads base on demand)"
         >
-          {compareDisabled ? '⏳ Base loading' : compareMode ? '✕ Compare' : '⇄ Compare'}
+          {compareMode ? '✕ Compare' : '⇄ Compare'}
         </button>
       </div>
 

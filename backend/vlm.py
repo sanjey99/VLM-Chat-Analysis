@@ -3,13 +3,13 @@ import logging
 import threading
 import time
 from abc import ABC, abstractmethod
-from typing import Iterator
+from typing import Callable, Iterator
 
 import torch
 from PIL import Image
 from transformers import AutoProcessor, TextIteratorStreamer
 
-from config import MODEL_REGISTRY, MAX_NEW_TOKENS
+from config import MODEL_REGISTRY, BASE_MODEL_REGISTRY, DEFAULT_BASE_MODEL, MAX_NEW_TOKENS
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +19,8 @@ _load_lock = threading.Lock()
 _gen_lock = threading.Lock()
 _loading = False
 
-_base_adapter = None
-_base_current_id: str | None = None
-_base_load_lock = threading.Lock()
-_base_loading = False
+# Selected base model for compare — loaded on demand, not pre-loaded.
+_selected_base_id: str | None = DEFAULT_BASE_MODEL
 
 
 # ---------------------------------------------------------------------------
@@ -163,33 +161,6 @@ def load_model(model_id: str) -> None:
             _loading = False
 
 
-def load_base_model(model_id: str) -> None:
-    global _base_adapter, _base_current_id, _base_loading
-    from config import BASE_MODEL_REGISTRY
-
-    with _base_load_lock:
-        _base_loading = True
-        try:
-            if _base_adapter is not None:
-                logger.info("Unloading base model %s…", _base_current_id)
-                _base_adapter.unload()
-                _base_adapter = None
-                _base_current_id = None
-
-            logger.info("Starting base model load: %s", model_id)
-            cfg = BASE_MODEL_REGISTRY[model_id]
-            new_adapter = _build_adapter(model_id, cfg)
-            new_adapter.load()
-            _base_adapter = new_adapter
-            _base_current_id = model_id
-            logger.info("Base model ready: %s", model_id)
-        except Exception:
-            logger.exception("Failed to load base model %s", model_id)
-            raise
-        finally:
-            _base_loading = False
-
-
 def is_ready() -> bool:
     return _adapter is not None and not _loading
 
@@ -202,16 +173,22 @@ def current_model_id() -> str | None:
     return _current_model_id
 
 
-def is_base_ready() -> bool:
-    return _base_adapter is not None and not _base_loading
-
-
-def is_base_loading() -> bool:
-    return _base_loading
+def set_base_model_id(model_id: str) -> None:
+    global _selected_base_id
+    _selected_base_id = model_id
 
 
 def get_base_model_id() -> str | None:
-    return _base_current_id
+    return _selected_base_id
+
+
+def is_base_ready() -> bool:
+    """Always True — base model is selected at startup and loaded on demand during compare."""
+    return _selected_base_id is not None
+
+
+def is_base_loading() -> bool:
+    return False
 
 
 def generate_stream(
@@ -264,9 +241,87 @@ def generate_stream_timed(
     return _stream_timed(_adapter, frames, prompt, history)
 
 
-def generate_base_stream_timed(
+def run_compare_consecutive(
     frames: list[Image.Image],
     prompt: str,
-    history: list[dict],
-) -> Iterator[dict]:
-    return _stream_timed(_base_adapter, frames, prompt, history)
+    on_event: Callable[[dict], None],
+) -> None:
+    """
+    Runs active model, unloads it, loads base model (full precision), runs base,
+    unloads base, then reloads active in background. Only one model in VRAM at a time.
+    """
+    global _adapter, _current_model_id, _loading
+
+    active_id: str | None = None
+
+    # Claim exclusive access: set _loading=True to block concurrent chat/compare requests.
+    with _load_lock:
+        if not (_adapter is not None and not _loading):
+            raise RuntimeError("Active model not ready")
+        if not _selected_base_id:
+            raise RuntimeError("No base model selected")
+        active_id = _current_model_id
+        base_id = _selected_base_id
+        _loading = True
+
+    active_response = ""
+    base_response = ""
+    base_adapter = None
+
+    try:
+        # --- Active model ---
+        on_event({"phase": "start_model", "model": active_id})
+        for item in _stream_timed(_adapter, frames, prompt, []):
+            if item["type"] == "token":
+                active_response += item["token"]
+                on_event({"phase": "token", "model": active_id, "token": item["token"]})
+            else:
+                on_event({"phase": "model_done", "model": active_id,
+                         "metrics": {k: v for k, v in item.items() if k != "type"}})
+
+        # --- Unload active ---
+        _adapter.unload()
+        _adapter = None
+        _current_model_id = None
+
+        # --- Load base ---
+        on_event({"phase": "loading_base", "model": base_id})
+        base_cfg = BASE_MODEL_REGISTRY[base_id]
+        base_adapter = _build_adapter(base_id, base_cfg)
+        base_adapter.load()
+
+        # --- Run base ---
+        on_event({"phase": "start_model", "model": base_id})
+        for item in _stream_timed(base_adapter, frames, prompt, []):
+            if item["type"] == "token":
+                base_response += item["token"]
+                on_event({"phase": "token", "model": base_id, "token": item["token"]})
+            else:
+                on_event({"phase": "model_done", "model": base_id,
+                         "metrics": {k: v for k, v in item.items() if k != "type"}})
+
+        # --- Unload base ---
+        base_adapter.unload()
+        base_adapter = None
+
+        # --- ROUGE-L ---
+        from rouge_score import rouge_scorer as rs
+        scorer = rs.RougeScorer(["rougeL"], use_stemmer=True)
+        score = scorer.score(active_response, base_response)
+        on_event({"phase": "compare_done", "rouge_l": round(score["rougeL"].fmeasure, 3)})
+
+    except Exception as exc:
+        on_event({"error": str(exc)})
+        if base_adapter is not None:
+            try:
+                base_adapter.unload()
+            except Exception:
+                pass
+
+    finally:
+        with _load_lock:
+            _loading = False
+
+    # Reload active model in background so the user can continue chatting.
+    if active_id:
+        threading.Thread(target=load_model, args=(active_id,), daemon=True).start()

@@ -11,7 +11,6 @@ export default function App() {
   const [session, setSession] = useState<VideoSession | null>(null)
   const [activeModel, setActiveModel] = useState<string | null>(null)
   const [inputType, setInputType] = useState<'video' | 'image'>('video')
-  const [baseReady, setBaseReady] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
 
   const handleModelReady = useCallback((modelId: string, type: 'video' | 'image') => {
@@ -21,9 +20,6 @@ export default function App() {
     })
     setInputType(type)
   }, [])
-
-  const handleBaseReady = useCallback(() => setBaseReady(true), [])
-  const handleBaseLoading = useCallback(() => setBaseReady(false), [])
 
   return (
     <div className="app">
@@ -37,7 +33,7 @@ export default function App() {
         </button>
       </header>
       <main className="app__main">
-        <ModelSelector onModelReady={handleModelReady} onBaseReady={handleBaseReady} onBaseLoading={handleBaseLoading} />
+        <ModelSelector onModelReady={handleModelReady} />
         {session ? (
           <VideoPreview session={session} onClear={() => setSession(null)} />
         ) : (
@@ -49,7 +45,6 @@ export default function App() {
           mediaType={session?.mediaType ?? 'video'}
           modelId={activeModel}
           modelReady={!!activeModel}
-          baseReady={baseReady}
         />
         {showHistory && <HistoryPanel onClose={() => setShowHistory(false)} />}
       </main>

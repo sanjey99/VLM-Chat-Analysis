@@ -5,11 +5,9 @@ import './ModelSelector.css'
 
 interface ModelSelectorProps {
   onModelReady: (modelId: string, inputType: 'video' | 'image') => void
-  onBaseReady: () => void
-  onBaseLoading: () => void
 }
 
-export function ModelSelector({ onModelReady, onBaseReady, onBaseLoading }: ModelSelectorProps) {
+export function ModelSelector({ onModelReady }: ModelSelectorProps) {
   const [models, setModels] = useState<ModelInfo[]>([])
   const [activeModel, setActiveModel] = useState<string | null>(null)
   const [loadingModel, setLoadingModel] = useState<string | null>(null)
@@ -17,16 +15,14 @@ export function ModelSelector({ onModelReady, onBaseReady, onBaseLoading }: Mode
   const [vramTotal, setVramTotal] = useState<number | null>(null)
   const [baseModels, setBaseModels] = useState<{ id: string; label: string }[]>([])
   const [activeBaseModel, setActiveBaseModel] = useState<string | null>(null)
-  const [loadingBaseModel, setLoadingBaseModel] = useState<string | null>(null)
-  const [baseStatus, setBaseStatus] = useState<'loading' | 'ready' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const baseRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchModels = useCallback(() => {
     setError(null)
     listModels()
-      .then(({ models, current, loading, base_ready, base_loading, base_model, base_models }) => {
+      .then(({ models, current, loading, base_model, base_models }) => {
         setModels(models)
         setActiveModel(current)
         setBaseModels(base_models)
@@ -37,23 +33,17 @@ export function ModelSelector({ onModelReady, onBaseReady, onBaseLoading }: Mode
           const loaded = models.find((m) => m.id === current)
           onModelReady(current, loaded?.inputType ?? 'video')
         }
-        if (base_ready) {
-          setBaseStatus('ready')
-          onBaseReady()
-        } else if (base_loading || loading) {
-          setBaseStatus('loading')
-        }
       })
       .catch((err) => {
         console.error('listModels failed:', err)
         const msg = err instanceof Error ? err.message : String(err)
         setError(`Could not reach backend: ${msg}`)
       })
-  }, [onBaseReady])
+  }, [onModelReady])
 
   useEffect(() => { fetchModels() }, [fetchModels])
 
-  // Poll system/info while an active model is loading
+  // Fast poll while an active model is loading (user-triggered or post-compare reload).
   useEffect(() => {
     if (!loadingModel) {
       if (pollRef.current) clearInterval(pollRef.current)
@@ -76,31 +66,25 @@ export function ModelSelector({ onModelReady, onBaseReady, onBaseLoading }: Mode
     }, 1500)
 
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [loadingModel, onModelReady])
+  }, [loadingModel, onModelReady, models])
 
-  // Poll for base model readiness
+  // Slow heartbeat — detects externally-triggered loading (e.g. post-compare active model reload).
   useEffect(() => {
-    if (baseStatus === 'ready') return
+    if (loadingModel) return  // fast poll already running
 
-    baseRef.current = setInterval(async () => {
+    heartbeatRef.current = setInterval(async () => {
       try {
         const info = await getSystemInfo()
         if (info.vram_used_gb !== null) setVramUsed(info.vram_used_gb)
         if (info.vram_total_gb !== null) setVramTotal(info.vram_total_gb)
-        if (info.base_ready) {
-          setBaseStatus('ready')
-          if (info.base_model) setActiveBaseModel(info.base_model)
-          setLoadingBaseModel(null)
-          onBaseReady()
-          clearInterval(baseRef.current!)
-        } else if (info.base_loading) {
-          setBaseStatus('loading')
+        if (info.loading && info.current_model) {
+          setLoadingModel(info.current_model)  // kicks off fast poll
         }
       } catch {}
-    }, 2000)
+    }, 3000)
 
-    return () => { if (baseRef.current) clearInterval(baseRef.current) }
-  }, [baseStatus, onBaseReady])
+    return () => { if (heartbeatRef.current) clearInterval(heartbeatRef.current) }
+  }, [loadingModel])
 
   async function handleSelect(modelId: string) {
     if (modelId === activeModel || loadingModel) return
@@ -115,19 +99,13 @@ export function ModelSelector({ onModelReady, onBaseReady, onBaseLoading }: Mode
   }
 
   async function handleBaseSelect(modelId: string) {
-    if (modelId === activeBaseModel || loadingBaseModel) return
+    if (modelId === activeBaseModel) return
     setError(null)
-    setLoadingBaseModel(modelId)
-    setBaseStatus('loading')
-    onBaseLoading()
     try {
-      await loadBaseModel(modelId)
+      await loadBaseModel(modelId)  // now instant — just stores the selection
+      setActiveBaseModel(modelId)
     } catch (err) {
       setError((err as Error).message)
-      setLoadingBaseModel(null)
-      // old base model still resident — restore ready state
-      setBaseStatus('ready')
-      onBaseReady()
     }
   }
 
@@ -166,28 +144,18 @@ export function ModelSelector({ onModelReady, onBaseReady, onBaseLoading }: Mode
         <>
           <div className="model-selector__header">
             <span className="model-selector__label">Base model (compare)</span>
-            <div className="model-selector__header-right">
-              {baseStatus === 'loading' && (
-                <span className="model-selector__base-status">Loading…</span>
-              )}
-              {baseStatus === 'ready' && (
-                <span className="model-selector__base-status model-selector__base-status--ready">Ready</span>
-              )}
-            </div>
+            <span className="model-selector__base-status">Loaded on compare</span>
           </div>
           <div className="model-selector__options">
             {baseModels.map((m) => {
-              const isActive = m.id === activeBaseModel && !loadingBaseModel
-              const isLoading = m.id === loadingBaseModel
+              const isActive = m.id === activeBaseModel
               return (
                 <button
                   key={m.id}
-                  className={`model-selector__btn model-selector__btn--base${isActive ? ' model-selector__btn--active' : ''}${isLoading ? ' model-selector__btn--loading' : ''}`}
+                  className={`model-selector__btn model-selector__btn--base${isActive ? ' model-selector__btn--active' : ''}`}
                   onClick={() => handleBaseSelect(m.id)}
-                  disabled={!!loadingBaseModel}
                   title={m.id}
                 >
-                  {isLoading && <span className="model-selector__spinner" />}
                   {m.label}
                 </button>
               )
