@@ -57,6 +57,7 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, b
       mediaType,
       modelId,
       messages,
+      messageCount: visible.length,
       createdAt: messages[0].timestamp,
       updatedAt: Date.now(),
     })
