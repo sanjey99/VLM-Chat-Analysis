@@ -4,6 +4,7 @@ import { VideoPreview } from './components/VideoPreview'
 import { ChatPanel } from './components/ChatPanel'
 import { ModelSelector } from './components/ModelSelector'
 import { HistoryPanel } from './components/HistoryPanel'
+import { EvalPanel } from './components/EvalPanel'
 import type { VideoSession } from './types'
 import './App.css'
 
@@ -12,6 +13,7 @@ export default function App() {
   const [activeModel, setActiveModel] = useState<string | null>(null)
   const [inputType, setInputType] = useState<'video' | 'image'>('video')
   const [showHistory, setShowHistory] = useState(false)
+  const [showEval, setShowEval] = useState(false)
 
   const handleModelReady = useCallback((modelId: string, type: 'video' | 'image') => {
     setActiveModel((prev) => {
@@ -28,9 +30,14 @@ export default function App() {
           <h1 className="app__title">VLM Chat</h1>
           <p className="app__subtitle">Describe and query video scenes with AI</p>
         </div>
-        <button className="app__history-btn" onClick={() => setShowHistory(true)} title="Chat history">
-          History
-        </button>
+        <div className="app__header-btns">
+          <button className="app__history-btn" onClick={() => setShowEval(true)} title="Evaluation harness">
+            Eval
+          </button>
+          <button className="app__history-btn" onClick={() => setShowHistory(true)} title="Chat history">
+            History
+          </button>
+        </div>
       </header>
       <main className="app__main">
         <ModelSelector onModelReady={handleModelReady} />
@@ -47,6 +54,7 @@ export default function App() {
           modelReady={!!activeModel}
         />
         {showHistory && <HistoryPanel onClose={() => setShowHistory(false)} />}
+        {showEval && <EvalPanel onClose={() => setShowEval(false)} />}
       </main>
     </div>
   )

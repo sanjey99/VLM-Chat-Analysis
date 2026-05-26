@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from video_utils import extract_frames, get_duration, is_image, is_supported, load_image
 from vlm import (
     current_model_id, generate_stream_timed, run_compare_consecutive,
+    run_eval_consecutive,
     get_base_model_id, is_loading, is_ready, is_base_loading, is_base_ready,
     load_model, set_base_model_id,
 )
@@ -251,3 +252,66 @@ async def compare_stream(req: CompareRequest):
                 break
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@app.get("/videos")
+async def list_videos():
+    return [
+        {"video_id": vid, "filename": meta["filename"], "media_type": meta["media_type"]}
+        for vid, meta in _video_store.items()
+    ]
+
+
+class EvalRunRequest(BaseModel):
+    cases: list[dict]   # [{video_id, prompt, reference?}]
+    model_ids: list[str]
+
+
+@app.post("/eval/run")
+async def eval_run(req: EvalRunRequest):
+    if not req.cases:
+        raise HTTPException(400, "No test cases provided.")
+    if not req.model_ids:
+        raise HTTPException(400, "No models selected.")
+    if not is_ready() and not is_loading():
+        raise HTTPException(503, "Backend not ready.")
+
+    resolved: list[dict] = []
+    for c in req.cases:
+        vid = c.get("video_id", "")
+        if vid not in _video_store:
+            raise HTTPException(404, f"Video not found: {vid}. Upload it first.")
+        meta = _video_store[vid]
+        resolved.append({
+            "path": meta["path"],
+            "media_type": meta["media_type"],
+            "prompt": c["prompt"],
+            "reference": c.get("reference") or None,
+        })
+
+    loop = asyncio.get_event_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    def run():
+        try:
+            def on_event(event: dict):
+                loop.call_soon_threadsafe(queue.put_nowait, event)
+            run_eval_consecutive(resolved, req.model_ids, on_event)
+        except Exception as exc:
+            loop.call_soon_threadsafe(queue.put_nowait, {"error": str(exc)})
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    threading.Thread(target=run, daemon=True).start()
+
+    async def eval_event_stream():
+        while True:
+            item = await queue.get()
+            if item is None:
+                yield "data: [DONE]\n\n"
+                break
+            yield f"data: {json.dumps(item)}\n\n"
+            if "error" in item:
+                break
+
+    return StreamingResponse(eval_event_stream(), media_type="text/event-stream")

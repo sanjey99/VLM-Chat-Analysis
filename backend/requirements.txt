@@ -18,3 +18,6 @@ bitsandbytes>=0.43.0
 
 # Compare mode — ROUGE-L similarity scoring
 rouge-score>=0.4.0
+
+# Eval harness — semantic similarity scoring
+bert-score>=0.3.13
