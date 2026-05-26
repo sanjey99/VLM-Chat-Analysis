@@ -25,7 +25,12 @@ export function ModelSelector({ onModelReady, onBaseReady }: ModelSelectorProps)
       .then(({ models, current, loading, base_ready, base_loading }) => {
         setModels(models)
         setActiveModel(current)
-        if (loading) setLoadingModel(current ?? '__startup__')
+        if (loading) {
+          setLoadingModel(current ?? '__startup__')
+        } else if (current) {
+          const loaded = models.find((m) => m.id === current)
+          onModelReady(current, loaded?.inputType ?? 'video')
+        }
         // Sync initial base model state
         if (base_ready) {
           setBaseStatus('ready')
