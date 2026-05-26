@@ -36,7 +36,6 @@ MODEL_REGISTRY: dict[str, dict] = {
 DEFAULT_MODEL = "Darwin-Project/MUSEG-3B"
 
 # Base models available for compare mode.
-# 2B/3B run in full precision; 7B uses 4-bit to stay within 24 GB alongside the active model.
 BASE_MODEL_REGISTRY: dict[str, dict] = {
     "Qwen/Qwen2.5-VL-2B-Instruct": {
         "label": "Qwen2.5-VL 2B",
