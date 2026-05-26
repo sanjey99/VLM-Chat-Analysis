@@ -59,6 +59,7 @@ export interface CompareMetrics {
   total_ms: number
   tokens_per_sec: number
   token_count: number
+  vram_used_gb?: number | null
 }
 
 export type CompareEvent =

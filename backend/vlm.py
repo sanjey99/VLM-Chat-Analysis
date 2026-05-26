@@ -244,11 +244,14 @@ def generate_stream_timed(
 def run_compare_consecutive(
     frames: list[Image.Image],
     prompt: str,
+    active_history: list[dict],
+    base_history: list[dict],
     on_event: Callable[[dict], None],
 ) -> None:
     """
     Runs active model, unloads it, loads base model (full precision), runs base,
     unloads base, then reloads active in background. Only one model in VRAM at a time.
+    Each model receives its own prior turn history so multi-turn compare works correctly.
     """
     global _adapter, _current_model_id, _loading
 
@@ -271,7 +274,7 @@ def run_compare_consecutive(
     try:
         # --- Active model ---
         on_event({"phase": "start_model", "model": active_id})
-        for item in _stream_timed(_adapter, frames, prompt, []):
+        for item in _stream_timed(_adapter, frames, prompt, active_history):
             if item["type"] == "token":
                 active_response += item["token"]
                 on_event({"phase": "token", "model": active_id, "token": item["token"]})
@@ -292,7 +295,7 @@ def run_compare_consecutive(
 
         # --- Run base ---
         on_event({"phase": "start_model", "model": base_id})
-        for item in _stream_timed(base_adapter, frames, prompt, []):
+        for item in _stream_timed(base_adapter, frames, prompt, base_history):
             if item["type"] == "token":
                 base_response += item["token"]
                 on_event({"phase": "token", "model": base_id, "token": item["token"]})

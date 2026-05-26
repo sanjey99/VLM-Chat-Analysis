@@ -91,12 +91,14 @@ export async function* streamChat(
 export async function* streamCompare(
   videoId: string,
   prompt: string,
+  activeHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
+  baseHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
   signal?: AbortSignal,
 ): AsyncGenerator<CompareEvent> {
   const res = await appFetch(`${BACKEND}/compare/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ video_id: videoId, prompt }),
+    body: JSON.stringify({ video_id: videoId, prompt, active_history: activeHistory, base_history: baseHistory }),
     signal,
   })
 

@@ -15,6 +15,7 @@ interface ComparePanelProps {
   rougeL: number | null
   status: 'idle' | 'running' | 'done' | 'error'
   error?: string
+  vramSamples?: Array<{ t: number; gb: number }>
 }
 
 function shortName(modelId: string): string {
@@ -56,13 +57,34 @@ function ModelCol({ col }: { col: ColState }) {
   )
 }
 
+function VramChart({ samples }: { samples: Array<{ t: number; gb: number }> }) {
+  if (samples.length < 2) return null
+  const W = 300
+  const H = 36
+  const maxGb = Math.max(...samples.map((s) => s.gb), 0.1)
+  const maxT = Math.max(samples[samples.length - 1].t, 1)
+  const pts = samples
+    .map((s) => `${(s.t / maxT) * W},${H - (s.gb / maxGb) * H}`)
+    .join(' ')
+  const current = samples[samples.length - 1].gb
+  return (
+    <div className="compare-vram">
+      <span className="compare-vram__label">VRAM</span>
+      <svg viewBox={`0 0 ${W} ${H}`} className="compare-vram__svg" preserveAspectRatio="none">
+        <polyline points={pts} className="compare-vram__line" fill="none" strokeWidth="1.5" />
+      </svg>
+      <span className="compare-vram__current">{current} GB</span>
+    </div>
+  )
+}
+
 function rougeBadge(score: number): string {
   if (score > 0.7) return 'High overlap — models largely agree'
   if (score > 0.4) return 'Moderate overlap — some differences'
   return 'Low overlap — specialist diverges from base'
 }
 
-export function ComparePanel({ leftCol, rightCol, rougeL, status, error }: ComparePanelProps) {
+export function ComparePanel({ leftCol, rightCol, rougeL, status, error, vramSamples }: ComparePanelProps) {
   if (status === 'idle') return null
 
   return (
@@ -73,6 +95,7 @@ export function ComparePanel({ leftCol, rightCol, rougeL, status, error }: Compa
         <div className="compare-panel__divider" />
         <ModelCol col={rightCol} />
       </div>
+      {vramSamples && vramSamples.length >= 2 && <VramChart samples={vramSamples} />}
       {rougeL !== null && (
         <div className="compare-panel__rouge">
           <span className="compare-panel__rouge-score">{(rougeL * 100).toFixed(1)}%</span>

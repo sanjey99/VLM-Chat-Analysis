@@ -200,6 +200,8 @@ async def chat_stream(req: ChatRequest):
 class CompareRequest(BaseModel):
     video_id: str
     prompt: str
+    active_history: list = []
+    base_history: list = []
 
 
 @app.post("/compare/stream")
@@ -229,7 +231,7 @@ async def compare_stream(req: CompareRequest):
             def on_event(event: dict):
                 loop.call_soon_threadsafe(queue.put_nowait, event)
 
-            run_compare_consecutive(frames, req.prompt, on_event)
+            run_compare_consecutive(frames, req.prompt, req.active_history, req.base_history, on_event)
 
         except Exception as exc:
             loop.call_soon_threadsafe(queue.put_nowait, {"error": str(exc)})
