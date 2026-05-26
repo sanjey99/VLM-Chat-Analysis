@@ -103,52 +103,8 @@ class QwenAdapter(BaseAdapter):
             skip_prompt=True,
             skip_special_tokens=True,
         )
-        gen_kwargs = dict(**inputs, streamer=streamer, max_new_tokens=MAX_NEW_TOKENS)
-        thread = threading.Thread(target=self.model.generate, kwargs=gen_kwargs, daemon=True)
-        with _gen_lock:
-            thread.start()
-            yield from streamer
-            thread.join()
-
-
-class GemmaAdapter(BaseAdapter):
-    def load(self) -> None:
-        from transformers import AutoModelForImageTextToText
-
-        self.processor = AutoProcessor.from_pretrained(self.model_id)
-        self.model = AutoModelForImageTextToText.from_pretrained(
-            self.model_id,
-            dtype=None if self.cfg["use_4bit"] else torch.bfloat16,
-            quantization_config=self._quantization_config(),
-            device_map="auto",
-        )
-        self.model.eval()
-
-    def generate_stream(
-        self,
-        frames: list[Image.Image],
-        prompt: str,
-        history: list[dict],
-    ) -> Iterator[str]:
-        messages = list(history)
-        content = [{"type": "image", "image": frame} for frame in frames]
-        content.append({"type": "text", "text": prompt})
-        messages.append({"role": "user", "content": content})
-
-        inputs = self.processor.apply_chat_template(
-            messages,
-            add_generation_prompt=True,
-            tokenize=True,
-            return_dict=True,
-            return_tensors="pt",
-        ).to(self.model.device)
-
-        streamer = TextIteratorStreamer(
-            self.processor.tokenizer,
-            skip_prompt=True,
-            skip_special_tokens=True,
-        )
-        gen_kwargs = dict(**inputs, streamer=streamer, max_new_tokens=MAX_NEW_TOKENS)
+        max_tokens = self.cfg.get("max_new_tokens", MAX_NEW_TOKENS)
+        gen_kwargs = dict(**inputs, streamer=streamer, max_new_tokens=max_tokens)
         thread = threading.Thread(target=self.model.generate, kwargs=gen_kwargs, daemon=True)
         with _gen_lock:
             thread.start()
@@ -160,7 +116,7 @@ class GemmaAdapter(BaseAdapter):
 # Public API
 # ---------------------------------------------------------------------------
 
-_FAMILY_MAP = {"qwen": QwenAdapter, "gemma": GemmaAdapter}
+_FAMILY_MAP = {"qwen": QwenAdapter}
 
 
 def _build_adapter(model_id: str) -> BaseAdapter:
