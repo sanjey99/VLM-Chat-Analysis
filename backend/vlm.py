@@ -328,3 +328,180 @@ def run_compare_consecutive(
     # Reload active model in background so the user can continue chatting.
     if active_id:
         threading.Thread(target=load_model, args=(active_id,), daemon=True).start()
+
+
+def run_eval_consecutive(
+    cases: list[dict],
+    model_ids: list[str],
+    on_event: Callable[[dict], None],
+) -> None:
+    """
+    Evaluates a set of (video, prompt, reference?) cases across multiple models.
+    Loads each model in full precision, runs all cases, then unloads before the next model.
+    Emits SSE-style event dicts via on_event. Reloads the original active model on completion.
+
+    cases: [{path, media_type, prompt, reference?}]
+    model_ids: list of IDs from MODEL_REGISTRY or BASE_MODEL_REGISTRY
+    """
+    global _adapter, _current_model_id, _loading
+
+    from video_utils import extract_frames, load_image
+
+    all_registry = {**MODEL_REGISTRY, **BASE_MODEL_REGISTRY}
+    original_model_id: str | None = None
+
+    with _load_lock:
+        if _loading:
+            raise RuntimeError("Another operation is in progress — wait for the current task to finish.")
+        if not model_ids:
+            raise RuntimeError("No models selected.")
+        original_model_id = _current_model_id
+        _loading = True
+
+    # Accumulated results: all_results[model_id][case_idx]
+    all_results: dict[str, list[dict]] = {}
+    # Frame cache so the same video isn't decoded repeatedly for each model
+    frame_cache: dict[tuple, list] = {}
+
+    try:
+        if _adapter is not None:
+            _adapter.unload()
+            _adapter = None
+            _current_model_id = None
+
+        for m_idx, model_id in enumerate(model_ids):
+            if model_id not in all_registry:
+                on_event({"error": f"Unknown model: {model_id}"})
+                continue
+
+            on_event({"phase": "loading_model", "model": model_id,
+                      "model_idx": m_idx, "total_models": len(model_ids)})
+
+            cfg = all_registry[model_id]
+            _adapter = _build_adapter(model_id, cfg)
+            _adapter.load()
+            _current_model_id = model_id
+
+            fps = cfg.get("fps", 1.0)
+            max_frames = cfg.get("max_frames", 8)
+            model_cases: list[dict] = []
+
+            for c_idx, case in enumerate(cases):
+                on_event({"phase": "start_case", "model": model_id,
+                          "case_idx": c_idx, "total_cases": len(cases)})
+
+                cache_key = (case["path"], case["media_type"], fps, max_frames)
+                if cache_key not in frame_cache:
+                    if case["media_type"] == "image":
+                        frame_cache[cache_key] = load_image(case["path"])
+                    else:
+                        frame_cache[cache_key] = extract_frames(
+                            case["path"], fps=fps, max_frames=max_frames)
+                frames = frame_cache[cache_key]
+
+                response = ""
+                metrics_dict: dict | None = None
+                for item in _stream_timed(_adapter, frames, case["prompt"], []):
+                    if item["type"] == "token":
+                        response += item["token"]
+                        on_event({"phase": "token", "model": model_id,
+                                  "case_idx": c_idx, "token": item["token"]})
+                    else:
+                        metrics_dict = {k: v for k, v in item.items() if k != "type"}
+
+                rouge_l: float | None = None
+                if case.get("reference") and response:
+                    from rouge_score import rouge_scorer as rs
+                    scorer = rs.RougeScorer(["rougeL"], use_stemmer=True)
+                    score = scorer.score(case["reference"], response)
+                    rouge_l = round(score["rougeL"].fmeasure, 3)
+
+                case_result = {"response": response, "metrics": metrics_dict, "rouge_l": rouge_l}
+                model_cases.append(case_result)
+                on_event({"phase": "case_done", "model": model_id,
+                          "case_idx": c_idx, "result": case_result})
+
+            all_results[model_id] = model_cases
+            _adapter.unload()
+            _adapter = None
+            _current_model_id = None
+            on_event({"phase": "model_done", "model": model_id})
+
+        # --- BERTScore (optional — graceful if package absent) ---
+        try:
+            from bert_score import score as bert_score_fn  # type: ignore
+            refs_flat: list[str] = []
+            hyps_flat: list[str] = []
+            ref_keys: list[tuple[str, int]] = []
+
+            for model_id in model_ids:
+                for c_idx, (case, result) in enumerate(
+                        zip(cases, all_results.get(model_id, []))):
+                    if case.get("reference") and result.get("response"):
+                        refs_flat.append(case["reference"])
+                        hyps_flat.append(result["response"])
+                        ref_keys.append((model_id, c_idx))
+
+            if refs_flat:
+                on_event({"phase": "computing_bert_score"})
+                _, _, F1 = bert_score_fn(
+                    hyps_flat, refs_flat, lang="en", verbose=False, device="cpu")
+                for (model_id, c_idx), f1 in zip(ref_keys, F1.tolist()):
+                    all_results[model_id][c_idx]["bert_score"] = round(f1, 3)
+        except ImportError:
+            pass
+
+        # --- Leaderboard ---
+        leaderboard = []
+        for model_id in model_ids:
+            case_results = all_results.get(model_id, [])
+            if not case_results:
+                continue
+            ttfts = [r["metrics"]["ttft_ms"] for r in case_results if r.get("metrics")]
+            tokpss = [r["metrics"]["tokens_per_sec"] for r in case_results if r.get("metrics")]
+            rouge_ls = [r["rouge_l"] for r in case_results if r.get("rouge_l") is not None]
+            bert_scores = [r.get("bert_score") for r in case_results
+                           if r.get("bert_score") is not None]
+            leaderboard.append({
+                "model_id": model_id,
+                "label": all_registry[model_id]["label"],
+                "avg_ttft_ms": round(sum(ttfts) / len(ttfts)) if ttfts else None,
+                "avg_tokens_per_sec": round(sum(tokpss) / len(tokpss), 1) if tokpss else None,
+                "avg_rouge_l": round(sum(rouge_ls) / len(rouge_ls), 3) if rouge_ls else None,
+                "avg_bert_score": round(sum(bert_scores) / len(bert_scores), 3)
+                                  if bert_scores else None,
+            })
+        leaderboard.sort(
+            key=lambda x: x["avg_rouge_l"] or x["avg_tokens_per_sec"] or 0, reverse=True)
+
+        details = [
+            {
+                "case_idx": i,
+                "prompt": cases[i]["prompt"],
+                "reference": cases[i].get("reference"),
+                "results": {
+                    mid: all_results[mid][i]
+                    for mid in model_ids
+                    if mid in all_results and i < len(all_results[mid])
+                },
+            }
+            for i in range(len(cases))
+        ]
+        on_event({"phase": "eval_done", "leaderboard": leaderboard, "details": details})
+
+    except Exception as exc:
+        on_event({"error": str(exc)})
+        if _adapter is not None:
+            try:
+                _adapter.unload()
+            except Exception:
+                pass
+            _adapter = None
+            _current_model_id = None
+
+    finally:
+        with _load_lock:
+            _loading = False
+
+    if original_model_id:
+        threading.Thread(target=load_model, args=(original_model_id,), daemon=True).start()
