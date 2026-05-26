@@ -4,23 +4,28 @@ import { MessageBubble } from './MessageBubble'
 import { ComparePanel, type ColState } from './ComparePanel'
 import { runAgentLoop } from '../services/agentLoop'
 import { streamCompare } from '../services/vlmService'
+import { saveLog } from '../services/chatStore'
 import './ChatPanel.css'
 
 interface ChatPanelProps {
   videoId: string | null
+  filename: string | null
+  mediaType: 'video' | 'image'
+  modelId: string | null
   modelReady: boolean
   baseReady: boolean
 }
 
 const EMPTY_COL: ColState = { model: '', response: '', metrics: null, streaming: false }
 
-export function ChatPanel({ videoId, modelReady, baseReady }: ChatPanelProps) {
+export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady, baseReady }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const logIdRef = useRef<string | null>(null)
 
   // Compare mode state
   const [compareMode, setCompareMode] = useState(false)
@@ -38,7 +43,24 @@ export function ChatPanel({ videoId, modelReady, baseReady }: ChatPanelProps) {
     setLeftCol(EMPTY_COL)
     setRightCol(EMPTY_COL)
     setRougeL(null)
+    logIdRef.current = null
   }, [videoId])
+
+  useEffect(() => {
+    const visible = messages.filter(m => m.role !== 'tool')
+    if (visible.length < 2 || !videoId || !modelId || !filename) return
+    if (visible[visible.length - 1].role !== 'assistant') return
+    if (!logIdRef.current) logIdRef.current = crypto.randomUUID()
+    saveLog({
+      id: logIdRef.current,
+      filename,
+      mediaType,
+      modelId,
+      messages,
+      createdAt: messages[0].timestamp,
+      updatedAt: Date.now(),
+    })
+  }, [messages, videoId, modelId, filename, mediaType])
 
   const disabled = !videoId || isStreaming || !modelReady
 

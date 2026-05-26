@@ -31,6 +31,20 @@ export interface SystemInfo {
   base_model?: string | null
 }
 
+export interface ChatLogMeta {
+  id: string
+  filename: string
+  mediaType: 'video' | 'image'
+  modelId: string
+  createdAt: number
+  updatedAt: number
+  messageCount: number
+}
+
+export interface ChatLog extends ChatLogMeta {
+  messages: Message[]
+}
+
 export interface CompareMetrics {
   ttft_ms: number
   total_ms: number
