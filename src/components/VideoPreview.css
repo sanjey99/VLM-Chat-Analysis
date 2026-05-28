@@ -1,4 +1,9 @@
+/* Right column, top row */
 .video-preview {
+  grid-column: 2;
+  grid-row: 1;
+  margin: var(--space-4) var(--space-4) 0;
+
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -9,7 +14,7 @@
 .video-preview__media {
   width: 100%;
   max-height: 200px;
-  background: oklch(0.07 0.006 56);
+  background: oklch(0.058 0.012 244);
   display: flex;
   align-items: center;
   justify-content: center;

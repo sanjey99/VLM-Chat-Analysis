@@ -2,6 +2,7 @@
   flex-shrink: 0;
   padding: var(--space-2) var(--space-4) var(--space-3);
   border-top: 1px solid var(--border-subtle);
+  background: var(--bg-base);
 }
 
 .metrics-chart__header {
@@ -12,17 +13,18 @@
 }
 
 .metrics-chart__title {
-  font-size: 9px;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.11em;
+  letter-spacing: 0.12em;
   color: var(--text-muted);
 }
 
 .metrics-chart__peak {
-  font-size: 11px;
-  color: var(--accent);
   font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
@@ -39,7 +41,7 @@
 
 .metrics-chart__bar {
   fill: var(--accent);
-  opacity: 0.55;
+  opacity: 0.45;
   transition: opacity 0.1s;
   cursor: default;
 }
@@ -47,7 +49,7 @@
 .metrics-chart__bar:hover { opacity: 1; }
 
 .metrics-chart__tick {
-  font-size: 9px;
+  font-size: 8px;
   font-family: var(--font-mono);
   fill: var(--text-muted);
 }

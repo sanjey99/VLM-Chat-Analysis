@@ -1,5 +1,9 @@
+/* Right column, top row */
 .video-upload {
-  background: var(--bg-surface);
+  grid-column: 2;
+  grid-row: 1;
+  margin: var(--space-4) var(--space-4) 0;
+
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: var(--space-8) var(--space-6) var(--space-6);
@@ -8,30 +12,38 @@
   align-items: center;
   gap: var(--space-3);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
   user-select: none;
+  transition: border-color 0.15s, background 0.15s;
+
+  /* Dot-grid background — precision instrument aesthetic */
+  background-color: var(--bg-surface);
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0;
 }
 
 .video-upload:hover:not(.video-upload--uploading) {
   border-color: var(--accent-dim);
-  background: var(--bg-elevated);
+  background-color: var(--bg-elevated);
+  background-image: radial-gradient(circle, var(--accent-dim) 1px, transparent 1px);
 }
 
 .video-upload--drag-over {
   border-color: var(--accent);
-  background: var(--accent-subtle);
+  background-color: var(--accent-subtle);
+  background-image: radial-gradient(circle, oklch(0.79 0.175 196 / 0.4) 1.5px, transparent 1.5px);
 }
 
 .video-upload--uploading { cursor: default; opacity: 0.7; }
 
 .video-upload__icon {
-  font-size: 28px;
+  font-size: 26px;
   line-height: 1;
-  opacity: 0.35;
+  opacity: 0.28;
   transition: opacity 0.15s;
 }
 
-.video-upload:hover:not(.video-upload--uploading) .video-upload__icon { opacity: 0.6; }
+.video-upload:hover:not(.video-upload--uploading) .video-upload__icon { opacity: 0.55; }
 .video-upload--drag-over .video-upload__icon { opacity: 0.9; }
 
 .video-upload__label {
@@ -45,6 +57,7 @@
   font-size: 11px;
   color: var(--text-muted);
   margin: 0;
+  font-family: var(--font-mono);
   letter-spacing: 0.01em;
 }
 

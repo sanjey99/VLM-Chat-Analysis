@@ -13,7 +13,7 @@
   text-transform: uppercase;
   letter-spacing: 0.09em;
   color: var(--text-muted);
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-weight: 600;
   padding-left: 2px;
 }
@@ -33,7 +33,7 @@
 
 .message-bubble--user .message-bubble__content {
   background: var(--accent-subtle);
-  border: 1px solid oklch(0.75 0.155 52 / 0.18);
+  border: 1px solid oklch(0.79 0.175 196 / 0.20);
   color: var(--text-primary);
   font-family: var(--font-ui);
   font-size: 13px;

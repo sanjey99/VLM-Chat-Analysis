@@ -1,86 +1,116 @@
-.model-selector { display: flex; flex-direction: column; gap: var(--space-2); }
+/* ── Sidebar panel — spans full height of the two-column grid ── */
+
+.model-selector {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── Section blocks ── */
+
+.model-selector__section {
+  padding: var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
 
 .model-selector__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: var(--space-2);
 }
 
 .model-selector__label {
-  font-size: 10px;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.12em;
 }
 
 .model-selector__header-right {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
 }
 
 .model-selector__vram {
-  font-size: 11px;
-  color: var(--text-muted);
   font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-dim);
+  padding: 2px 6px;
+  border-radius: 3px;
 }
 
 .model-selector__base-status {
+  font-family: var(--font-ui);
   font-size: 10px;
   color: var(--text-muted);
   font-style: italic;
 }
 
-.model-selector__base-status--ready {
-  color: var(--accent);
-  font-style: normal;
-  font-weight: 600;
-}
+/* ── Button list (vertical) ── */
 
-/* Unified button strip */
 .model-selector__options {
   display: flex;
+  flex-direction: column;
   gap: 2px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 3px;
 }
 
 .model-selector__btn {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
   padding: var(--space-2) var(--space-3);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
+  font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.1s, color 0.1s, border-color 0.1s;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
+  min-width: 0;
 }
 
 .model-selector__btn:hover:not(:disabled) {
   background: var(--bg-elevated);
   color: var(--text-secondary);
+  border-color: var(--border-subtle);
 }
 
 .model-selector__btn--active {
-  background: var(--bg-elevated);
-  border-color: var(--border);
+  background: var(--accent-subtle);
+  border-color: var(--accent-dim);
   color: var(--accent);
   font-weight: 600;
+}
+
+.model-selector__btn--active::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 7px var(--accent);
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .model-selector__btn--loading {
@@ -92,6 +122,10 @@
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+.model-selector__btn--base { font-size: 11px; }
+
+/* ── Spinner ── */
 
 .model-selector__spinner {
   width: 9px;
@@ -105,10 +139,13 @@
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Error ── */
+
 .model-selector__error-row {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  padding: var(--space-3);
 }
 
 .model-selector__error {
@@ -119,17 +156,18 @@
 }
 
 .model-selector__retry {
-  font-size: 11px;
-  padding: 3px 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 3px 9px;
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: pointer;
+  letter-spacing: 0.04em;
   transition: color 0.1s, border-color 0.1s;
   white-space: nowrap;
+  text-transform: uppercase;
 }
 
-.model-selector__retry:hover { border-color: var(--accent); color: var(--accent); }
-
-.model-selector__btn--base { font-size: 11px; }
+.model-selector__retry:hover { border-color: var(--accent-dim); color: var(--accent); }

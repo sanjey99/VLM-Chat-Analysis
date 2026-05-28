@@ -43,7 +43,6 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
 
   useEffect(() => { fetchModels() }, [fetchModels])
 
-  // Fast poll while an active model is loading (user-triggered or post-compare reload).
   useEffect(() => {
     if (!loadingModel) {
       if (pollRef.current) clearInterval(pollRef.current)
@@ -68,9 +67,8 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [loadingModel, onModelReady, models])
 
-  // Slow heartbeat — detects externally-triggered loading (e.g. post-compare active model reload).
   useEffect(() => {
-    if (loadingModel) return  // fast poll already running
+    if (loadingModel) return
 
     heartbeatRef.current = setInterval(async () => {
       try {
@@ -78,7 +76,7 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
         if (info.vram_used_gb !== null) setVramUsed(info.vram_used_gb)
         if (info.vram_total_gb !== null) setVramTotal(info.vram_total_gb)
         if (info.loading && info.current_model) {
-          setLoadingModel(info.current_model)  // kicks off fast poll
+          setLoadingModel(info.current_model)
         }
       } catch {}
     }, 3000)
@@ -102,7 +100,7 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
     if (modelId === activeBaseModel) return
     setError(null)
     try {
-      await loadBaseModel(modelId)  // now instant — just stores the selection
+      await loadBaseModel(modelId)
       setActiveBaseModel(modelId)
     } catch (err) {
       setError((err as Error).message)
@@ -111,40 +109,42 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
 
   return (
     <div className="model-selector">
-      <div className="model-selector__header">
-        <span className="model-selector__label">Model</span>
-        <div className="model-selector__header-right">
-          {vramTotal !== null && (
-            <span className="model-selector__vram">
-              VRAM {vramUsed ?? '—'} / {vramTotal} GB
-            </span>
-          )}
+      <div className="model-selector__section">
+        <div className="model-selector__header">
+          <span className="model-selector__label">Model</span>
+          <div className="model-selector__header-right">
+            {vramTotal !== null && (
+              <span className="model-selector__vram">
+                {vramUsed ?? '—'}/{vramTotal}GB
+              </span>
+            )}
+          </div>
         </div>
-      </div>
-      <div className="model-selector__options">
-        {models.map((m) => {
-          const isActive = m.id === activeModel && !loadingModel
-          const isLoading = m.id === loadingModel
-          return (
-            <button
-              key={m.id}
-              className={`model-selector__btn${isActive ? ' model-selector__btn--active' : ''}${isLoading ? ' model-selector__btn--loading' : ''}`}
-              onClick={() => handleSelect(m.id)}
-              disabled={!!loadingModel}
-              title={m.id}
-            >
-              {isLoading && <span className="model-selector__spinner" />}
-              {m.label}
-            </button>
-          )
-        })}
+        <div className="model-selector__options">
+          {models.map((m) => {
+            const isActive = m.id === activeModel && !loadingModel
+            const isLoading = m.id === loadingModel
+            return (
+              <button
+                key={m.id}
+                className={`model-selector__btn${isActive ? ' model-selector__btn--active' : ''}${isLoading ? ' model-selector__btn--loading' : ''}`}
+                onClick={() => handleSelect(m.id)}
+                disabled={!!loadingModel}
+                title={m.id}
+              >
+                {isLoading && <span className="model-selector__spinner" />}
+                {m.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {baseModels.length > 0 && (
-        <>
+        <div className="model-selector__section">
           <div className="model-selector__header">
-            <span className="model-selector__label">Base model (compare)</span>
-            <span className="model-selector__base-status">Loaded on compare</span>
+            <span className="model-selector__label">Base (compare)</span>
+            <span className="model-selector__base-status">on demand</span>
           </div>
           <div className="model-selector__options">
             {baseModels.map((m) => {
@@ -161,7 +161,7 @@ export function ModelSelector({ onModelReady }: ModelSelectorProps) {
               )
             })}
           </div>
-        </>
+        </div>
       )}
 
       {error && (

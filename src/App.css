@@ -1,36 +1,34 @@
-/* src/App.css */
-
 :root {
-  /* Surface ladder — each step clearly distinct */
-  --bg-base:        oklch(0.095 0.008 56);
-  --bg-surface:     oklch(0.135 0.011 56);
-  --bg-elevated:    oklch(0.175 0.013 56);
-  --bg-input:       oklch(0.150 0.011 56);
+  /* Cool charcoal-slate surfaces — a different identity from the warm amber build */
+  --bg-base:       oklch(0.058 0.012 244);
+  --bg-surface:    oklch(0.098 0.016 240);
+  --bg-elevated:   oklch(0.140 0.018 236);
+  --bg-input:      oklch(0.115 0.015 240);
 
-  /* Accent — warm amber, earned usage */
-  --accent:         oklch(0.75 0.155 52);
-  --accent-dim:     oklch(0.52 0.110 52);
-  --accent-subtle:  oklch(0.155 0.042 52);
+  /* Electric cyan — high chroma, hue 196 (vs prior amber hue 52) */
+  --accent:        oklch(0.79 0.175 196);
+  --accent-dim:    oklch(0.52 0.120 196);
+  --accent-subtle: oklch(0.115 0.062 196);
 
-  /* Text */
-  --text-primary:   oklch(0.935 0.008 58);
-  --text-secondary: oklch(0.575 0.011 58);
-  --text-muted:     oklch(0.385 0.007 58);
+  /* Text — cool-tinted neutral stack */
+  --text-primary:   oklch(0.936 0.009 228);
+  --text-secondary: oklch(0.585 0.012 228);
+  --text-muted:     oklch(0.365 0.007 228);
 
   /* Borders */
-  --border:         oklch(0.215 0.009 58);
-  --border-subtle:  oklch(0.162 0.007 58);
+  --border:        oklch(0.208 0.013 232);
+  --border-subtle: oklch(0.146 0.009 234);
 
   /* Semantic */
-  --error:          oklch(0.65 0.16 25);
-  --error-bg:       oklch(0.155 0.035 25);
+  --error:    oklch(0.655 0.200 22);
+  --error-bg: oklch(0.112 0.048 22);
 
   /* Spacing */
   --space-1: 4px;  --space-2: 8px;   --space-3: 12px;
   --space-4: 16px; --space-5: 20px;  --space-6: 24px;
   --space-8: 32px; --space-12: 48px;
 
-  /* Fonts */
+  /* Typography */
   --font-ui:   system-ui, -apple-system, sans-serif;
   --font-chat: Georgia, 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
@@ -56,7 +54,7 @@ body {
 
 #root { width: 100vw; height: 100vh; display: flex; }
 
-/* ── App shell ────────────────────────────────────── */
+/* ── App shell ── */
 
 .app {
   position: relative;
@@ -64,74 +62,77 @@ body {
   flex-direction: column;
   width: 100%;
   height: 100vh;
-  max-width: 760px;
-  margin: 0 auto;
 }
 
 .app__header {
-  padding: var(--space-4) var(--space-6);
+  height: 52px;
+  padding: 0 var(--space-6);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
+  background: var(--bg-surface);
 }
 
 .app__title {
-  font-size: 15px;
+  font-family: var(--font-mono);
+  font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   line-height: 1;
 }
 
 .app__subtitle {
   font-size: 11px;
   color: var(--text-muted);
-  margin-top: 4px;
+  margin-top: 3px;
   letter-spacing: 0.01em;
 }
 
 .app__header-btns {
   display: flex;
-  gap: var(--space-1);
+  gap: var(--space-2);
   align-items: center;
 }
 
 .app__history-btn {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
   padding: 5px 11px;
   border-radius: var(--radius-sm);
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  transition: color 0.12s, background 0.12s, border-color 0.12s;
+  transition: color 0.12s, background 0.12s, border-color 0.12s, box-shadow 0.12s;
 }
 
 .app__history-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-elevated);
-  border-color: var(--border);
+  color: var(--accent);
+  border-color: var(--accent-dim);
+  background: var(--accent-subtle);
+  box-shadow: 0 0 10px oklch(0.79 0.175 196 / 0.15);
 }
+
+/* ── Two-column main — sidebar + content ── */
 
 .app__main {
   flex: 1;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 256px 1fr;
+  grid-template-rows: auto 1fr;
   overflow: hidden;
-  padding: var(--space-4) var(--space-6);
-  gap: var(--space-3);
 }
 
-/* ── Scrollbars ───────────────────────────────────── */
+/* ── Scrollbars ── */
 
-::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
