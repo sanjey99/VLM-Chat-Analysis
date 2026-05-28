@@ -206,7 +206,7 @@ export function ChatPanel({ videoId, filename, mediaType, modelId, modelReady }:
     setVramSamples([])
   }
 
-  const compareDisabled = false  // base model loaded on demand during compare
+
 
   return (
     <div className="chat-panel">
