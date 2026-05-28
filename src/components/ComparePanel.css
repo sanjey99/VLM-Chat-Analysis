@@ -9,10 +9,10 @@
 
 .compare-panel__error {
   font-size: 12px;
-  color: oklch(0.65 0.15 25);
-  background: oklch(0.18 0.04 25);
-  border: 1px solid oklch(0.28 0.08 25);
-  border-radius: 6px;
+  color: var(--error);
+  background: var(--error-bg);
+  border: 1px solid oklch(0.65 0.16 25 / 0.3);
+  border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
 }
 
@@ -22,15 +22,19 @@
   gap: 0;
   overflow: hidden;
   min-height: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
 }
 
 .compare-panel__divider {
   width: 1px;
-  background: var(--border);
+  background: var(--border-subtle);
   flex-shrink: 0;
 }
 
-/* --- Column --- */
+/* ── Column ── */
+
 .compare-col {
   flex: 1;
   display: flex;
@@ -44,43 +48,43 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
 .compare-col__name {
   font-family: var(--font-ui);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--accent);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .compare-col__dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--accent);
   flex-shrink: 0;
-  animation: pulse 1s ease-in-out infinite;
+  animation: pulse 1.4s ease-in-out infinite;
 }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  50% { opacity: 0.2; }
 }
 
 .compare-col__response {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-3);
+  padding: var(--space-4) var(--space-3);
   font-family: var(--font-chat);
   font-size: 13px;
-  line-height: 1.65;
+  line-height: 1.7;
   color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
@@ -93,13 +97,14 @@
   font-size: 12px;
 }
 
-/* --- Metric cards --- */
+/* ── Metric cells ── */
+
 .compare-col__metrics {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1px;
-  background: var(--border);
-  border-top: 1px solid var(--border);
+  background: var(--border-subtle);
+  border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
@@ -113,11 +118,12 @@
 }
 
 .compare-metric__value {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
   color: var(--accent);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
 }
 
 .compare-metric__label {
@@ -125,10 +131,11 @@
   font-size: 9px;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
 }
 
-/* --- VRAM sparkline --- */
+/* ── VRAM sparkline ── */
+
 .compare-vram {
   display: flex;
   align-items: center;
@@ -138,7 +145,7 @@
 }
 
 .compare-vram__label {
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 600;
   color: var(--text-muted);
@@ -150,53 +157,55 @@
 
 .compare-vram__svg {
   flex: 1;
-  height: 36px;
+  height: 32px;
   display: block;
 }
 
 .compare-vram__line {
   stroke: var(--accent);
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .compare-vram__current {
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
   color: var(--accent);
   flex-shrink: 0;
-  width: 44px;
+  width: 48px;
   text-align: right;
+  letter-spacing: -0.02em;
 }
 
-/* --- ROUGE-L footer --- */
+/* ── ROUGE-L footer ── */
+
 .compare-panel__rouge {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   flex-shrink: 0;
 }
 
 .compare-panel__rouge-score {
-  font-family: var(--font-ui);
-  font-size: 16px;
+  font-family: var(--font-mono);
+  font-size: 15px;
   font-weight: 700;
   color: var(--accent);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   flex-shrink: 0;
 }
 
 .compare-panel__rouge-label {
   font-family: var(--font-ui);
   font-size: 10px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-weight: 700;
+  color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   flex-shrink: 0;
 }
 

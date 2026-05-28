@@ -1,69 +1,79 @@
 .message-bubble {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  max-width: 88%;
+  gap: 5px;
+  max-width: 86%;
 }
 
-.message-bubble--user {
-  align-self: flex-end;
-}
-
-.message-bubble--assistant {
-  align-self: flex-start;
-}
+.message-bubble--user { align-self: flex-end; }
+.message-bubble--assistant { align-self: flex-start; }
 
 .message-bubble__label {
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent);
+  letter-spacing: 0.09em;
+  color: var(--text-muted);
   font-family: var(--font-ui);
   font-weight: 600;
-  padding-left: var(--space-1);
+  padding-left: 2px;
+}
+
+.message-bubble--user .message-bubble__label {
+  text-align: right;
+  padding-left: 0;
+  padding-right: 2px;
 }
 
 .message-bubble__content {
   padding: var(--space-3) var(--space-4);
-  border-radius: 12px;
-  line-height: 1.6;
+  line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .message-bubble--user .message-bubble__content {
   background: var(--accent-subtle);
+  border: 1px solid oklch(0.75 0.155 52 / 0.18);
   color: var(--text-primary);
   font-family: var(--font-ui);
-  border-radius: 12px 12px 2px 12px;
+  font-size: 13px;
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
 }
 
 .message-bubble--assistant .message-bubble__content {
   background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
   color: var(--text-primary);
   font-family: var(--font-chat);
   font-size: 14px;
-  border-radius: 2px 12px 12px 12px;
+  border-radius: var(--radius-sm) var(--radius-lg) var(--radius-lg) var(--radius-lg);
 }
 
 .message-bubble__cursor {
   display: inline-block;
   width: 2px;
-  height: 1em;
+  height: 0.9em;
   background: var(--accent);
   margin-left: 2px;
   vertical-align: middle;
   animation: blink 1s step-end infinite;
 }
 
-@keyframes blink {
-  50% { opacity: 0; }
-}
+@keyframes blink { 50% { opacity: 0; } }
 
 .message-bubble__metrics {
-  display: flex; flex-wrap: wrap; gap: 2px 0;
-  font-size: 10px; font-family: var(--font-ui);
-  color: var(--text-muted); padding-left: var(--space-1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 0;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  padding-left: 2px;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
-.message-bubble__metrics-sep { color: var(--border); margin: 0 4px; }
+
+.message-bubble__metrics-sep {
+  color: var(--border);
+  margin: 0 5px;
+}
