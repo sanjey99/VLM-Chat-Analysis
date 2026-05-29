@@ -105,7 +105,8 @@ async def system_info():
         props = torch.cuda.get_device_properties(0)
         gpu_name = props.name
         vram_total_gb = round(props.total_memory / 1024 ** 3, 1)
-        vram_used_gb = round(torch.cuda.memory_allocated(0) / 1024 ** 3, 2)
+        free_bytes, total_bytes = torch.cuda.mem_get_info(0)
+        vram_used_gb = round((total_bytes - free_bytes) / 1024 ** 3, 2)
 
     return {
         "gpu": gpu_name,
