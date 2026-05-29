@@ -28,11 +28,11 @@
 
 .model-selector__label {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.10em;
 }
 
 .model-selector__header-right {
@@ -42,7 +42,7 @@
 
 .model-selector__vram {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--accent);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
@@ -54,7 +54,7 @@
 
 .model-selector__base-status {
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-muted);
   font-style: italic;
 }
@@ -75,7 +75,7 @@
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.1s, color 0.1s, border-color 0.1s;
@@ -123,7 +123,7 @@
   cursor: not-allowed;
 }
 
-.model-selector__btn--base { font-size: 11px; }
+.model-selector__btn--base { font-size: 13px; }
 
 /* ── Spinner ── */
 
@@ -149,7 +149,7 @@
 }
 
 .model-selector__error {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--error);
   margin: 0;
   flex: 1;
@@ -157,7 +157,7 @@
 
 .model-selector__retry {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   padding: 3px 9px;
   background: transparent;
   border: 1px solid var(--border);

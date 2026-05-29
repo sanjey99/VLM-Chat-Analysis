@@ -56,7 +56,7 @@
 
 .compare-col__name {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--accent);
   text-transform: uppercase;
@@ -86,7 +86,7 @@
   overflow-y: auto;
   padding: var(--space-4) var(--space-3);
   font-family: var(--font-chat);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.7;
   color: var(--text-primary);
   white-space: pre-wrap;
@@ -97,7 +97,7 @@
   color: var(--text-muted);
   font-style: italic;
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 /* ── Metric cells ── */
@@ -122,7 +122,7 @@
 
 .compare-metric__value {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--accent);
   letter-spacing: -0.03em;
@@ -131,7 +131,7 @@
 
 .compare-metric__label {
   font-family: var(--font-ui);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -149,7 +149,7 @@
 
 .compare-vram__label {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -171,7 +171,7 @@
 
 .compare-vram__current {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--accent);
   flex-shrink: 0;
@@ -204,7 +204,7 @@
 
 .compare-panel__rouge-label {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -214,7 +214,7 @@
 
 .compare-panel__rouge-hint {
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   flex: 1;
 }

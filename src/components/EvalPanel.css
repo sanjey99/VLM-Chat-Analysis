@@ -34,7 +34,7 @@
 
 .eval-panel__title {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.02em;
@@ -47,7 +47,7 @@
   color: var(--text-muted);
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   line-height: 1;
@@ -85,7 +85,7 @@
 
 .eval-section__label {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -96,7 +96,7 @@
 
 .eval-hint {
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 
@@ -104,7 +104,7 @@
 
 .eval-add-btn {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--accent);
   background: none;
@@ -190,7 +190,7 @@
 
 .eval-text-btn {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   background: none;
   border: none;
@@ -216,7 +216,7 @@
   align-items: center;
   gap: var(--space-1);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
   background: var(--bg-elevated);
@@ -252,7 +252,7 @@
 
 .eval-run-btn {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   background: var(--accent);
   color: oklch(0.058 0.012 244);
@@ -320,7 +320,7 @@
 
 .eval-progress__pct {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--accent);
   width: 32px;
@@ -331,7 +331,7 @@
 
 .eval-progress__text {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -339,7 +339,7 @@
 
 .eval-progress__stream {
   font-family: var(--font-chat);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.55;
   max-height: 80px;
@@ -355,12 +355,12 @@
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .eval-leaderboard th {
   text-align: left;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.10em;
@@ -405,7 +405,7 @@
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-3);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
   cursor: pointer;
   text-align: left;
@@ -416,7 +416,7 @@
 .eval-case-toggle:hover { border-color: var(--border); color: var(--text-primary); }
 
 .eval-case-toggle__chevron {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-muted);
   flex-shrink: 0;
 }
@@ -468,7 +468,7 @@
 
 .eval-case-detail__col-name {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -482,7 +482,7 @@
   flex: 1;
   padding: var(--space-2) var(--space-3);
   font-family: var(--font-chat);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--text-primary);
   white-space: pre-wrap;
@@ -508,7 +508,7 @@
 
 .eval-case-detail__metrics span {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-muted);
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;

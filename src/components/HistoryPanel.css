@@ -57,7 +57,7 @@
 }
 
 .history-panel__empty-list {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   padding: var(--space-4);
   text-align: center;
@@ -92,7 +92,7 @@
 
 .history-log-item__model {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -120,7 +120,7 @@
 .history-log-item__delete:hover { color: var(--error); background: var(--error-bg); }
 
 .history-log-item__filename {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
   margin: 0;
@@ -131,7 +131,7 @@
 
 .history-log-item__meta {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-muted);
   margin: 2px 0 0;
   letter-spacing: -0.01em;
@@ -176,7 +176,7 @@
 
 .history-panel__viewer-model {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
